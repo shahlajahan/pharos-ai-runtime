@@ -1,5 +1,6 @@
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
+import 'package:pharos_ai_runtime/core/config.dart';
 
 class Runtime {
   final _registry = AgentRegistry();
@@ -21,7 +22,7 @@ class Runtime {
     final context = ExecutionContext(
       sessionId: DateTime.now().millisecondsSinceEpoch.toString(),
       startedAt: DateTime.now(),
-      environment: 'development',
+      environment: Config.environment,
     );
 
     await agent.run(context);
