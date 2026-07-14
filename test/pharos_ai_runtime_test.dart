@@ -10,7 +10,16 @@ import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/runtime/execution_step.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
+import 'package:pharos_ai_runtime/tooling/tool.dart';
 import 'package:test/test.dart';
+
+class _FakeTool extends Tool {
+  @override
+  String get id => 'fake-tool';
+
+  @override
+  Future<Result> execute() async => Result.success('executed');
+}
 
 class _ThrowingAgent extends Agent {
   @override
@@ -210,4 +219,14 @@ void main() {
       );
     },
   );
+
+  test('Tool exposes id and execute() returning a Result', () async {
+    final tool = _FakeTool();
+
+    final result = await tool.execute();
+
+    expect(tool.id, 'fake-tool');
+    expect(result.success, isTrue);
+    expect(result.message, 'executed');
+  });
 }
