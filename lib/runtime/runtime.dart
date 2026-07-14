@@ -1,26 +1,32 @@
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/core/config.dart';
+import 'package:pharos_ai_runtime/core/logger.dart';
 
 class Runtime {
-  Runtime({Config config = const Config(), AgentRegistry? registry})
-    : _config = config,
-      _registry = registry ?? AgentRegistry();
+  Runtime({
+    Config config = const Config(),
+    AgentRegistry? registry,
+    Logger logger = const Logger(),
+  }) : _config = config,
+       _registry = registry ?? AgentRegistry(),
+       _logger = logger;
 
   final Config _config;
   final AgentRegistry _registry;
+  final Logger _logger;
 
   Future<void> run(List<String> args) async {
     if (args.isEmpty) {
-      print('Usage:');
-      print('pharos marketing');
+      _logger.info('Usage:');
+      _logger.info('pharos marketing');
       return;
     }
 
     final agent = _registry.find(args.first);
 
     if (agent == null) {
-      print('Unknown agent.');
+      _logger.warning('Unknown agent.');
       return;
     }
 
