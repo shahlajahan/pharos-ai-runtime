@@ -1,8 +1,13 @@
 class Config {
-  const Config._();
+  const Config({
+    this.appName = 'Pharos AI Runtime',
+    this.version = '0.1.0',
+    this.environment = 'development',
+    this.logLevel = 'info',
+  });
 
-  static const appName = 'Pharos AI Runtime';
-  static const version = '0.1.0';
-  static const environment = 'development';
-  static const logLevel = 'info';
+  final String appName;
+  final String version;
+  final String environment;
+  final String logLevel;
 }

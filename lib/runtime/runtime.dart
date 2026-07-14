@@ -3,7 +3,12 @@ import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/core/config.dart';
 
 class Runtime {
-  final _registry = AgentRegistry();
+  Runtime({Config config = const Config(), AgentRegistry? registry})
+    : _config = config,
+      _registry = registry ?? AgentRegistry();
+
+  final Config _config;
+  final AgentRegistry _registry;
 
   Future<void> run(List<String> args) async {
     if (args.isEmpty) {
@@ -22,7 +27,7 @@ class Runtime {
     final context = ExecutionContext(
       sessionId: DateTime.now().millisecondsSinceEpoch.toString(),
       startedAt: DateTime.now(),
-      environment: Config.environment,
+      environment: _config.environment,
     );
 
     await agent.run(context);
