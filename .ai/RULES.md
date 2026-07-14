@@ -10,3 +10,15 @@
 - Never change project architecture.
 - Keep solutions simple.
 - Stop after successful commit.
+The implementation agent must never modify:
+
+- SPRINT.md
+- TASK.md
+- ROADMAP.md
+- BACKLOG.md
+
+unless explicitly requested.
+
+The implementation agent must never decide what to work on next.
+
+After a successful commit, stop immediately.
