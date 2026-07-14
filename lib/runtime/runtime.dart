@@ -1,7 +1,6 @@
-import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
+import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/core/config.dart';
-import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 
@@ -10,13 +9,13 @@ class Runtime {
     Config config = const Config(),
     AgentRegistry? registry,
     Logger logger = const Logger(),
-  }) : _config = config,
-       _registry = registry ?? AgentRegistry(),
-       _logger = logger;
+  }) : _registry = registry ?? AgentRegistry(),
+       _logger = logger,
+       _pipeline = ExecutionPipeline(config: config, logger: logger);
 
-  final Config _config;
   final AgentRegistry _registry;
   final Logger _logger;
+  final ExecutionPipeline _pipeline;
 
   Future<Result?> run(List<String> args) async {
     if (args.isEmpty) {
@@ -32,24 +31,6 @@ class Runtime {
       return null;
     }
 
-    final job = Job(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      agentId: agent.id,
-      createdAt: DateTime.now(),
-    );
-
-    final context = ExecutionContext(
-      sessionId: DateTime.now().millisecondsSinceEpoch.toString(),
-      startedAt: DateTime.now(),
-      environment: _config.environment,
-      job: job,
-    );
-
-    try {
-      return await agent.run(context);
-    } catch (e) {
-      _logger.error('Agent "${agent.id}" failed: $e');
-      return Result.failure('Agent "${agent.id}" failed: $e');
-    }
+    return _pipeline.run(agent);
   }
 }
