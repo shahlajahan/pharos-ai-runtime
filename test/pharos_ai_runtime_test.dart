@@ -8,6 +8,7 @@ import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
+import 'package:pharos_ai_runtime/runtime/execution_step.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
 
@@ -179,6 +180,34 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.message, contains('boom'));
+    },
+  );
+
+  test('ExecutionStep stores id and name', () {
+    const step = ExecutionStep(id: 'step-1', name: 'agent-execution');
+
+    expect(step.id, 'step-1');
+    expect(step.name, 'agent-execution');
+  });
+
+  test(
+    'ExecutionPipeline creates and uses one ExecutionStep before invoking the Agent',
+    () async {
+      const pipeline = ExecutionPipeline(config: Config(), logger: Logger());
+      final agent = _CapturingAgent();
+      final output = <String>[];
+
+      await runZoned(
+        () => pipeline.run(agent),
+        zoneSpecification: ZoneSpecification(
+          print: (self, parent, zone, line) => output.add(line),
+        ),
+      );
+
+      expect(
+        output.any((line) => line.contains('agent-execution')),
+        isTrue,
+      );
     },
   );
 }

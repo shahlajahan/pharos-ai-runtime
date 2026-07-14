@@ -4,6 +4,7 @@ import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/runtime/execution_step.dart';
 
 class ExecutionPipeline {
   const ExecutionPipeline({required Config config, required Logger logger})
@@ -26,6 +27,12 @@ class ExecutionPipeline {
       environment: _config.environment,
       job: job,
     );
+
+    final step = ExecutionStep(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: 'agent-execution',
+    );
+    _logger.debug('Executing step "${step.name}" (${step.id})');
 
     try {
       return await agent.run(context);
