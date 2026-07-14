@@ -1,7 +1,8 @@
 import 'context.dart';
+import 'result.dart';
 
 abstract class Agent {
   String get id;
 
-  Future<void> run(ExecutionContext context);
+  Future<Result> run(ExecutionContext context);
 }

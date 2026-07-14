@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:pharos_ai_runtime/core/config.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
+import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -50,5 +52,28 @@ void main() {
       '[WARNING] warning message',
       '[ERROR] error message',
     ]);
+  });
+
+  test('Result.success carries success flag and message', () {
+    final result = Result.success('it worked');
+
+    expect(result.success, isTrue);
+    expect(result.message, 'it worked');
+  });
+
+  test('Result.failure carries success flag and message', () {
+    final result = Result.failure('it failed');
+
+    expect(result.success, isFalse);
+    expect(result.message, 'it failed');
+  });
+
+  test('Runtime resolves the marketing agent and returns its Result', () async {
+    final runtime = Runtime();
+
+    final result = await runtime.run(['marketing']);
+
+    expect(result, isNotNull);
+    expect(result!.success, isTrue);
   });
 }
