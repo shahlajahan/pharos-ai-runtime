@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/config.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
+import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
@@ -107,4 +108,29 @@ void main() {
       expect(result.message, contains('boom'));
     },
   );
+
+  test('Job stores id, agentId, and createdAt', () {
+    final createdAt = DateTime(2024, 1, 1);
+    final job = Job(id: 'job-1', agentId: 'marketing', createdAt: createdAt);
+
+    expect(job.id, 'job-1');
+    expect(job.agentId, 'marketing');
+    expect(job.createdAt, createdAt);
+  });
+
+  test('ExecutionContext exposes its Job', () {
+    final job = Job(
+      id: 'job-1',
+      agentId: 'marketing',
+      createdAt: DateTime(2024, 1, 1),
+    );
+    final context = ExecutionContext(
+      sessionId: 'session-1',
+      startedAt: DateTime(2024, 1, 1),
+      environment: 'test',
+      job: job,
+    );
+
+    expect(context.job, same(job));
+  });
 }

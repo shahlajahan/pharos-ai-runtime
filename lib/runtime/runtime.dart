@@ -1,6 +1,7 @@
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/core/config.dart';
+import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 
@@ -31,10 +32,17 @@ class Runtime {
       return null;
     }
 
+    final job = Job(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      agentId: agent.id,
+      createdAt: DateTime.now(),
+    );
+
     final context = ExecutionContext(
       sessionId: DateTime.now().millisecondsSinceEpoch.toString(),
       startedAt: DateTime.now(),
       environment: _config.environment,
+      job: job,
     );
 
     try {
