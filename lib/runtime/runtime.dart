@@ -37,6 +37,11 @@ class Runtime {
       environment: _config.environment,
     );
 
-    return agent.run(context);
+    try {
+      return await agent.run(context);
+    } catch (e) {
+      _logger.error('Agent "${agent.id}" failed: $e');
+      return Result.failure('Agent "${agent.id}" failed: $e');
+    }
   }
 }
