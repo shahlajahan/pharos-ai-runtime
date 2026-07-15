@@ -10,6 +10,7 @@ import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
+import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 
 void main(List<String> arguments) async {
@@ -27,10 +28,13 @@ void main(List<String> arguments) async {
           loader: EmployeeLoader(),
           parser: MarkdownEmployeeParser(),
         ),
-        knowledgeRepository: KnowledgeRepository(
-          parser: MarkdownKnowledgeParser(),
+        loader: EmployeeLoader(),
+        employeeFactory: EmployeeFactory(
+          knowledgeRepository: KnowledgeRepository(
+            parser: MarkdownKnowledgeParser(),
+          ),
+          promptRepository: PromptRepository(parser: MarkdownPromptParser()),
         ),
-        promptRepository: PromptRepository(parser: MarkdownPromptParser()),
       );
       i++;
     } else {

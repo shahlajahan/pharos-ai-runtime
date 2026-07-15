@@ -1,27 +1,26 @@
-import 'dart:io';
-
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/employees/employee_definition.dart';
 import 'package:pharos_ai_runtime/employees/employee_repository.dart';
+import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
-import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
-import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
+import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 
 class HQBootstrap {
   HQBootstrap({
     required HQValidator validator,
     required EmployeeRepository repository,
-    required KnowledgeRepository knowledgeRepository,
-    required PromptRepository promptRepository,
+    required EmployeeLoader loader,
+    required EmployeeFactory employeeFactory,
   }) : _validator = validator,
        _repository = repository,
-       _knowledgeRepository = knowledgeRepository,
-       _promptRepository = promptRepository;
+       _loader = loader,
+       _employeeFactory = employeeFactory;
 
   final HQValidator _validator;
   final EmployeeRepository _repository;
-  final KnowledgeRepository _knowledgeRepository;
-  final PromptRepository _promptRepository;
+  final EmployeeLoader _loader;
+  final EmployeeFactory _employeeFactory;
 
   Future<Result> boot(HQSource source) async {
     final validation = await _validator.validate(source);
@@ -30,24 +29,31 @@ class HQBootstrap {
       return validation;
     }
 
+    List<EmployeeDefinition> definitions;
+
     try {
-      await _repository.load(source);
+      definitions = await _repository.load(source);
     } catch (e) {
       return Result.failure('Failed to load employees: $e');
     }
 
-    final rootPath = await source.rootPath();
-
     try {
-      await _knowledgeRepository.load(Directory('$rootPath/knowledge'));
-    } catch (e) {
-      return Result.failure('Failed to load knowledge: $e');
-    }
+      for (final definition in definitions) {
+        final employeeDirectory = await _loader.load(source, definition.id);
 
-    try {
-      await _promptRepository.load(Directory('$rootPath/prompts'));
+        if (employeeDirectory == null) {
+          throw Exception(
+            'Employee directory not found for "${definition.id}".',
+          );
+        }
+
+        await _employeeFactory.create(
+          definition: definition,
+          employeeDirectory: employeeDirectory,
+        );
+      }
     } catch (e) {
-      return Result.failure('Failed to load prompts: $e');
+      return Result.failure('Failed to assemble employee runtime: $e');
     }
 
     return Result.success('HQ bootstrapped successfully.');
