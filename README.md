@@ -2,59 +2,74 @@
 
 > **The operating system for AI employees.**
 
-Pharos AI Runtime is a modular runtime platform for building autonomous AI employees.
+> ⚠️ **Status:** Foundation Phase  
+> Current milestone: **v0.2-memory-foundation**
 
-Instead of creating isolated AI agents for every product, Pharos provides a shared runtime where AI employees execute workflows, use tools, access memory, and collaborate through a common execution model.
+Pharos AI Runtime is a modular execution platform for building autonomous AI employees.
+
+Instead of embedding AI logic into every application, Pharos provides a reusable runtime responsible for execution, orchestration, tooling, memory, workflows, and eventually intelligent employees.
+
+The goal is to separate **business intelligence** from **application code**.
 
 ---
 
 # Vision
 
-Traditional software runs applications.
+Traditional software executes functions.
 
-Pharos runs AI employees.
+Pharos executes AI employees.
 
-Applications should not know how AI thinks, remembers, plans, or communicates with external systems.
+Applications should never be responsible for how AI:
+
+- plans
+- remembers
+- communicates
+- executes
+- collaborates
 
 Those responsibilities belong to the runtime.
 
-The long-term goal of this project is to provide a reusable AI operating system that can power multiple products and organizations.
+The long-term vision is to build a reusable AI operating system capable of powering many different products without rewriting AI infrastructure.
 
 ---
 
 # Design Philosophy
 
-The runtime is built around a few simple principles.
+The architecture follows a few simple principles.
 
-## Small capabilities
+## Small Capabilities
 
-Every task introduces only one new capability.
+Every task introduces exactly one capability.
 
 No large feature branches.
 
 No "big bang" implementations.
 
----
-
-## Stable architecture
-
-Architecture evolves gradually.
-
-Every subsystem starts as a minimal abstraction before receiving implementations.
+Small steps produce stable architecture.
 
 ---
 
-## Composition over coupling
+## Stable Contracts
+
+Every subsystem begins as an abstraction.
+
+Implementations come later.
+
+Public contracts should remain stable.
+
+---
+
+## Composition over Coupling
 
 Subsystems communicate through contracts.
 
 Runtime should not know implementation details.
 
-Agents should not know infrastructure.
+Employees should not know infrastructure.
 
-Tools should not know runtime.
+Tools should not know Runtime.
 
-Memory should not know workflows.
+Memory should not know Workflows.
 
 ---
 
@@ -64,94 +79,101 @@ Dependencies are injected.
 
 No global state.
 
-No service locator.
+No service locators.
 
 No hidden singletons.
 
 ---
 
-## Runtime first
+## One Responsibility per Class
+
+Every class owns exactly one responsibility.
+
+Responsibilities should never overlap.
+
+---
+
+## Runtime First
 
 Products should never implement AI infrastructure directly.
 
-Instead:
-
-```
-Product
-    ↓
-Employee
-    ↓
-Workflow
-    ↓
-Memory
-    ↓
-Tooling
-    ↓
-Runtime
-```
+Instead, every product builds on the same execution platform.
 
 ---
 
-# Current Architecture
+# Architecture
 
 ```
 Applications
-        ↑
-
-Employees
-        ↑
-
-Workflow
-        ↑
-
-Memory
-        ↑
-
-Tooling
-        ↑
-
-Execution Engine
-        ↑
-
-Runtime
+        │
+        ▼
+ Employees
+        │
+        ▼
+ Workflows
+        │
+        ▼
+ ┌──────────────────────┐
+ │   Memory   |  Tools  │
+ └──────────────────────┘
+        │
+        ▼
+     Runtime
 ```
+
+The Runtime owns execution.
+
+Employees own business logic.
+
+Workflows define execution order.
+
+Tools communicate with external systems.
+
+Memory stores information.
 
 ---
 
-# Current Status
+# Current Foundation
 
-## Runtime Foundation
+## Runtime
 
 - ✅ Runtime
-- ✅ Execution Pipeline
-- ✅ Execution Step
+- ✅ Configuration
+- ✅ Logger
+- ✅ Result
 - ✅ Job
 - ✅ Execution Context
-- ✅ Result
-- ✅ Logger
-- ✅ Configuration
+- ✅ Execution Pipeline
+- ✅ Execution Step
+- ✅ Exception Boundary
+
+---
 
 ## Tooling
 
 - ✅ Tool
+- ✅ Tool Context
 - ✅ Tool Registry
 - ✅ Tool Invoker
-- ✅ Tool Context
+
+---
 
 ## Memory
 
 - ✅ Memory Contract
-- ⏳ Registry
-- ⏳ Context
+- ✅ Memory Context
+- ✅ Memory Registry
+- ✅ Memory Invoker
+
+---
+
+## Planned
+
+- ⏳ Employees
+- ⏳ Workflow Engine
+- ⏳ Workflow Steps
 - ⏳ Providers
-
-## Workflow
-
-Planned.
-
-## Employees
-
-Planned.
+- ⏳ LLM Integrations
 
 ---
 
@@ -160,25 +182,23 @@ Planned.
 ```
 lib/
 
-├── agents/
-├── core/
-├── memory/
-├── runtime/
-└── tooling/
+core/
+runtime/
+tooling/
+memory/
+agents/
 ```
 
 ---
 
-# Development Process
+# Development Workflow
 
 Development follows a strict AI-assisted workflow.
 
-Every feature is implemented through small, isolated tasks.
+Every task:
 
-Each task:
-
-- has a single objective
-- modifies the minimum number of files
+- introduces one capability
+- changes the minimum number of files
 - passes static analysis
 - passes all tests
 - creates exactly one commit
@@ -190,9 +210,9 @@ Planning documents live inside:
 .ai/
 ```
 
-The runtime itself never depends on these documents.
+They coordinate development only.
 
-They exist only to coordinate development.
+The runtime itself never depends on them.
 
 ---
 
@@ -208,55 +228,37 @@ They exist only to coordinate development.
 
 ## v0.2
 
-- Memory System
+- Memory Foundation
 
 ---
 
 ## v0.3
 
-- Workflow Engine
+- Employee Foundation
 
 ---
 
 ## v0.4
 
-- AI Employees
+- Workflow Engine
 
 ---
 
 ## v0.5
 
-- Production Runtime
+- Provider System
+
+---
+
+## v0.6
+
+- LLM Integrations
 
 ---
 
 ## v1.0
 
-Stable runtime ready to power multiple AI products.
-
----
-
-# Future Integrations
-
-The runtime is designed to support different implementations without changing its public architecture.
-
-Examples include:
-
-- OpenAI
-- Anthropic
-- Gemini
-- Local LLMs
-
-Tooling may later include:
-
-- HTTP
-- Filesystem
-- GitHub
-- Firestore
-- Vector databases
-- Custom enterprise systems
-
-These are intentionally **not** part of the runtime foundation.
+Stable runtime capable of powering multiple AI products.
 
 ---
 
@@ -266,26 +268,47 @@ Most AI frameworks begin with models.
 
 Pharos begins with architecture.
 
-The goal is not to wrap an LLM.
+The objective is not to wrap an LLM.
 
-The goal is to build an execution platform where autonomous AI employees can operate reliably across different products.
+The objective is to create a reusable execution platform where autonomous AI employees can safely operate across different products.
 
 ---
 
-# Project Status
+# Current Status
 
-This project is under active development.
+🚧 Active Development
 
-Public APIs may change before v1.0.
+The architecture is intentionally stabilized before production features are introduced.
 
-Architecture stability is prioritized over feature velocity.
+Public APIs may evolve until v1.0.
+
+Architectural stability is prioritized over feature velocity.
+
+---
+
+# Planned Products
+
+The same runtime is intended to power multiple products, including:
+
+- Petsupo
+- DevAudit
+- DevClean
+
+The runtime itself contains no product-specific logic.
+
+---
+
+# Contributing
+
+The project is currently in its foundation phase.
+
+Contributions are welcome after the core architecture reaches stability.
 
 ---
 
 # License
 
-License will be announced before the first stable release.
+The project is currently source-available during the foundation phase.
 
----
-
-The operating system for AI employees.
+An open-source license will be announced before the first stable release (v1.0).
+```
