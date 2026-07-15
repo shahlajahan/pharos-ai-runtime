@@ -7,6 +7,7 @@ import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/memory/memory.dart';
+import 'package:pharos_ai_runtime/memory/memory_context.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/runtime/execution_step.dart';
@@ -38,10 +39,12 @@ class _ThrowingTool extends Tool {
 
 class _FakeMemory extends Memory {
   @override
-  Future<Result> store() async => Result.success('stored');
+  Future<Result> store(MemoryContext context) async =>
+      Result.success('stored');
 
   @override
-  Future<Result> retrieve() async => Result.success('retrieved');
+  Future<Result> retrieve(MemoryContext context) async =>
+      Result.success('retrieved');
 }
 
 class _CapturingTool extends Tool {
@@ -334,15 +337,25 @@ void main() {
     expect(tool.capturedContext!.toolId, 'capturing-tool');
   });
 
-  test('Memory exposes store() and retrieve() returning a Result', () async {
-    final memory = _FakeMemory();
+  test(
+    'Memory exposes store(context) and retrieve(context) returning a Result',
+    () async {
+      final memory = _FakeMemory();
+      const context = MemoryContext(key: 'key-1');
 
-    final storeResult = await memory.store();
-    final retrieveResult = await memory.retrieve();
+      final storeResult = await memory.store(context);
+      final retrieveResult = await memory.retrieve(context);
 
-    expect(storeResult.success, isTrue);
-    expect(storeResult.message, 'stored');
-    expect(retrieveResult.success, isTrue);
-    expect(retrieveResult.message, 'retrieved');
+      expect(storeResult.success, isTrue);
+      expect(storeResult.message, 'stored');
+      expect(retrieveResult.success, isTrue);
+      expect(retrieveResult.message, 'retrieved');
+    },
+  );
+
+  test('MemoryContext stores only key', () {
+    const context = MemoryContext(key: 'key-1');
+
+    expect(context.key, 'key-1');
   });
 }
