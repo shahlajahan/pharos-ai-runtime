@@ -1,10 +1,6 @@
 import 'dart:io';
 
 import 'package:pharos_ai_runtime/employees/employee_definition.dart';
-import 'package:pharos_ai_runtime/employees/employee_repository.dart';
-import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
-import 'package:pharos_ai_runtime/hq/employee_loader.dart';
-import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
@@ -13,11 +9,6 @@ import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:test/test.dart';
 
 EmployeeFactory _factory() => EmployeeFactory(
-  employeeRepository: EmployeeRepository(
-    discovery: EmployeeDiscovery(),
-    loader: EmployeeLoader(),
-    parser: MarkdownEmployeeParser(),
-  ),
   knowledgeRepository: KnowledgeRepository(parser: MarkdownKnowledgeParser()),
   promptRepository: PromptRepository(parser: MarkdownPromptParser()),
 );
