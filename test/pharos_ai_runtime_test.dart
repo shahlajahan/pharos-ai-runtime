@@ -7,6 +7,7 @@ import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/employees/employee.dart';
+import 'package:pharos_ai_runtime/employees/employee_context.dart';
 import 'package:pharos_ai_runtime/memory/memory.dart';
 import 'package:pharos_ai_runtime/memory/memory_context.dart';
 import 'package:pharos_ai_runtime/memory/memory_invoker.dart';
@@ -45,7 +46,8 @@ class _FakeEmployee extends Employee {
   String get id => 'fake-employee';
 
   @override
-  Future<Result> execute() async => Result.success('employed');
+  Future<Result> execute(EmployeeContext context) async =>
+      Result.success('employed');
 }
 
 class _FakeMemory extends Memory {
@@ -493,13 +495,21 @@ void main() {
     },
   );
 
-  test('Employee exposes id and execute() returning a Result', () async {
+  test('Employee exposes id and execute(context) returning a Result', () async {
     final employee = _FakeEmployee();
 
-    final result = await employee.execute();
+    final result = await employee.execute(
+      const EmployeeContext(employeeId: 'fake-employee'),
+    );
 
     expect(employee.id, 'fake-employee');
     expect(result.success, isTrue);
     expect(result.message, 'employed');
+  });
+
+  test('EmployeeContext stores only employeeId', () {
+    const context = EmployeeContext(employeeId: 'employee-1');
+
+    expect(context.employeeId, 'employee-1');
   });
 }
