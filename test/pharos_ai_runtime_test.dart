@@ -9,6 +9,7 @@ import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/employees/employee.dart';
 import 'package:pharos_ai_runtime/employees/employee_context.dart';
 import 'package:pharos_ai_runtime/employees/employee_registry.dart';
+import 'package:pharos_ai_runtime/hq/hq_loader.dart';
 import 'package:pharos_ai_runtime/memory/memory.dart';
 import 'package:pharos_ai_runtime/memory/memory_context.dart';
 import 'package:pharos_ai_runtime/memory/memory_invoker.dart';
@@ -49,6 +50,11 @@ class _FakeEmployee extends Employee {
   @override
   Future<Result> execute(EmployeeContext context) async =>
       Result.success('employed');
+}
+
+class _FakeHQLoader extends HQLoader {
+  @override
+  Future<Result> load(String path) async => Result.success('loaded: $path');
 }
 
 class _FakeMemory extends Memory {
@@ -532,4 +538,13 @@ void main() {
       expect(registry.find('missing'), isNull);
     },
   );
+
+  test('HQLoader exposes load(path) returning a Result', () async {
+    final loader = _FakeHQLoader();
+
+    final result = await loader.load('/some/hq/path');
+
+    expect(result.success, isTrue);
+    expect(result.message, 'loaded: /some/hq/path');
+  });
 }
