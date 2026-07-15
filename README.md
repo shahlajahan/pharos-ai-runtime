@@ -3,7 +3,14 @@
 > **The operating system for AI employees.**
 
 > ⚠️ **Status:** Foundation Phase  
-> Current milestone: **v0.2-memory-foundation**
+> Current milestone: **v0.4-runtime-integration**
+
+## Milestones
+
+- v0.1-foundation
+- v0.2-memory-foundation
+- v0.3-hq-foundation
+- v0.4-runtime-integration
 
 Pharos AI Runtime is a modular execution platform for building autonomous AI employees.
 
@@ -274,15 +281,23 @@ The objective is to create a reusable execution platform where autonomous AI emp
 
 ---
 
-# Current Status
+## Current Status
 
-🚧 Active Development
+Current milestone:
 
-The architecture is intentionally stabilized before production features are introduced.
+✅ v0.3-hq-foundation
 
-Public APIs may evolve until v1.0.
+Completed:
 
-Architectural stability is prioritized over feature velocity.
+- Runtime foundation
+- Tooling foundation
+- Memory foundation
+- Employee foundation
+- HQ foundation
+
+Next milestone:
+
+➡ Runtime Integration
 
 ---
 
