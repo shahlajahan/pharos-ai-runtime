@@ -6,6 +6,7 @@ import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/employees/employee.dart';
 import 'package:pharos_ai_runtime/memory/memory.dart';
 import 'package:pharos_ai_runtime/memory/memory_context.dart';
 import 'package:pharos_ai_runtime/memory/memory_invoker.dart';
@@ -37,6 +38,14 @@ class _ThrowingTool extends Tool {
   Future<Result> execute(ToolContext context) async {
     throw StateError('tool boom');
   }
+}
+
+class _FakeEmployee extends Employee {
+  @override
+  String get id => 'fake-employee';
+
+  @override
+  Future<Result> execute() async => Result.success('employed');
 }
 
 class _FakeMemory extends Memory {
@@ -483,4 +492,14 @@ void main() {
       expect(memory.capturedContext!.key, 'unrelated-key');
     },
   );
+
+  test('Employee exposes id and execute() returning a Result', () async {
+    final employee = _FakeEmployee();
+
+    final result = await employee.execute();
+
+    expect(employee.id, 'fake-employee');
+    expect(result.success, isTrue);
+    expect(result.message, 'employed');
+  });
 }
