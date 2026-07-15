@@ -8,6 +8,8 @@ import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
+import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
+import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
@@ -23,9 +25,16 @@ EmployeeRepository _realRepository() => EmployeeRepository(
   parser: MarkdownEmployeeParser(),
 );
 
+KnowledgeRepository _realKnowledgeRepository() =>
+    KnowledgeRepository(parser: MarkdownKnowledgeParser());
+
 class _SucceedingBootstrap extends HQBootstrap {
   _SucceedingBootstrap()
-    : super(validator: HQValidator(), repository: _realRepository());
+    : super(
+        validator: HQValidator(),
+        repository: _realRepository(),
+        knowledgeRepository: _realKnowledgeRepository(),
+      );
 
   @override
   Future<Result> boot(HQSource source) async => Result.success('booted');
@@ -33,7 +42,11 @@ class _SucceedingBootstrap extends HQBootstrap {
 
 class _FailingBootstrap extends HQBootstrap {
   _FailingBootstrap()
-    : super(validator: HQValidator(), repository: _realRepository());
+    : super(
+        validator: HQValidator(),
+        repository: _realRepository(),
+        knowledgeRepository: _realKnowledgeRepository(),
+      );
 
   @override
   Future<Result> boot(HQSource source) async => Result.failure('boot failed');

@@ -1,17 +1,23 @@
+import 'dart:io';
+
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/employees/employee_repository.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
+import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 
 class HQBootstrap {
   HQBootstrap({
     required HQValidator validator,
     required EmployeeRepository repository,
+    required KnowledgeRepository knowledgeRepository,
   }) : _validator = validator,
-       _repository = repository;
+       _repository = repository,
+       _knowledgeRepository = knowledgeRepository;
 
   final HQValidator _validator;
   final EmployeeRepository _repository;
+  final KnowledgeRepository _knowledgeRepository;
 
   Future<Result> boot(HQSource source) async {
     final validation = await _validator.validate(source);
@@ -24,6 +30,13 @@ class HQBootstrap {
       await _repository.load(source);
     } catch (e) {
       return Result.failure('Failed to load employees: $e');
+    }
+
+    try {
+      final rootPath = await source.rootPath();
+      await _knowledgeRepository.load(Directory('$rootPath/knowledge'));
+    } catch (e) {
+      return Result.failure('Failed to load knowledge: $e');
     }
 
     return Result.success('HQ bootstrapped successfully.');

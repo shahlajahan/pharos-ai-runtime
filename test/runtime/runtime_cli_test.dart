@@ -7,6 +7,8 @@ import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
+import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
+import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
 
@@ -17,6 +19,7 @@ HQBootstrap _realBootstrap() => HQBootstrap(
     loader: EmployeeLoader(),
     parser: MarkdownEmployeeParser(),
   ),
+  knowledgeRepository: KnowledgeRepository(parser: MarkdownKnowledgeParser()),
 );
 
 void main() {

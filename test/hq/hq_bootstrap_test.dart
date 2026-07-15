@@ -8,6 +8,8 @@ import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
+import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
+import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:test/test.dart';
 
 class _EmployeeDiscoveryWithMissingEmployee extends EmployeeDiscovery {
@@ -36,6 +38,7 @@ HQBootstrap _bootstrap({EmployeeDiscovery? discovery}) => HQBootstrap(
     loader: EmployeeLoader(),
     parser: MarkdownEmployeeParser(),
   ),
+  knowledgeRepository: KnowledgeRepository(parser: MarkdownKnowledgeParser()),
 );
 
 void main() {
@@ -97,6 +100,33 @@ void main() {
       );
 
       final result = await bootstrap.boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isFalse);
+    },
+  );
+
+  test('boot() succeeds for an HQ with valid knowledge documents', () async {
+    Directory('${tempDir.path}/employees').createSync();
+    Directory('${tempDir.path}/knowledge').createSync();
+    File('${tempDir.path}/knowledge/onboarding.md').writeAsStringSync(
+      '# Onboarding Guide\n\nWelcome.',
+    );
+
+    final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+    expect(result.success, isTrue);
+  });
+
+  test(
+    'boot() returns Result.failure when a knowledge document cannot be parsed',
+    () async {
+      Directory('${tempDir.path}/employees').createSync();
+      Directory('${tempDir.path}/knowledge').createSync();
+      File(
+        '${tempDir.path}/knowledge/broken.md',
+      ).writeAsStringSync('No heading here.');
+
+      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
       expect(result.success, isFalse);
     },

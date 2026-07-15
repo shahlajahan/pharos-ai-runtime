@@ -6,6 +6,8 @@ import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
+import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
+import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 
 void main(List<String> arguments) async {
@@ -22,6 +24,9 @@ void main(List<String> arguments) async {
           discovery: EmployeeDiscovery(),
           loader: EmployeeLoader(),
           parser: MarkdownEmployeeParser(),
+        ),
+        knowledgeRepository: KnowledgeRepository(
+          parser: MarkdownKnowledgeParser(),
         ),
       );
       i++;
