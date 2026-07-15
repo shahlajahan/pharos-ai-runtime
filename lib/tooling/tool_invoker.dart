@@ -1,4 +1,5 @@
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/tooling/tool_context.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 
 class ToolInvoker {
@@ -13,8 +14,10 @@ class ToolInvoker {
       return Result.failure('Tool "$toolId" not found.');
     }
 
+    final context = ToolContext(toolId: toolId);
+
     try {
-      return await tool.execute();
+      return await tool.execute(context);
     } catch (e) {
       return Result.failure('Tool "$toolId" failed: $e');
     }

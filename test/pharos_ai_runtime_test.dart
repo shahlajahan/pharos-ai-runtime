@@ -11,6 +11,7 @@ import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/runtime/execution_step.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:pharos_ai_runtime/tooling/tool.dart';
+import 'package:pharos_ai_runtime/tooling/tool_context.dart';
 import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
@@ -20,7 +21,8 @@ class _FakeTool extends Tool {
   String get id => 'fake-tool';
 
   @override
-  Future<Result> execute() async => Result.success('executed');
+  Future<Result> execute(ToolContext context) async =>
+      Result.success('executed');
 }
 
 class _ThrowingTool extends Tool {
@@ -28,8 +30,21 @@ class _ThrowingTool extends Tool {
   String get id => 'throwing-tool';
 
   @override
-  Future<Result> execute() async {
+  Future<Result> execute(ToolContext context) async {
     throw StateError('tool boom');
+  }
+}
+
+class _CapturingTool extends Tool {
+  ToolContext? capturedContext;
+
+  @override
+  String get id => 'capturing-tool';
+
+  @override
+  Future<Result> execute(ToolContext context) async {
+    capturedContext = context;
+    return Result.success('captured');
   }
 }
 
@@ -232,14 +247,20 @@ void main() {
     },
   );
 
-  test('Tool exposes id and execute() returning a Result', () async {
+  test('Tool exposes id and execute(context) returning a Result', () async {
     final tool = _FakeTool();
 
-    final result = await tool.execute();
+    final result = await tool.execute(const ToolContext(toolId: 'fake-tool'));
 
     expect(tool.id, 'fake-tool');
     expect(result.success, isTrue);
     expect(result.message, 'executed');
+  });
+
+  test('ToolContext stores only toolId', () {
+    const context = ToolContext(toolId: 'tool-1');
+
+    expect(context.toolId, 'tool-1');
   });
 
   test('ToolRegistry defaults to empty and resolves nothing', () {
@@ -291,4 +312,16 @@ void main() {
       expect(result.message, contains('tool boom'));
     },
   );
+
+  test('ToolInvoker passes a ToolContext with the invoked toolId', () async {
+    final tool = _CapturingTool();
+    final invoker = ToolInvoker(
+      registry: ToolRegistry(tools: {tool.id: tool}),
+    );
+
+    await invoker.invoke('capturing-tool');
+
+    expect(tool.capturedContext, isNotNull);
+    expect(tool.capturedContext!.toolId, 'capturing-tool');
+  });
 }
