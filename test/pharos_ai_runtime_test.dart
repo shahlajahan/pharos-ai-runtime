@@ -6,6 +6,7 @@ import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/memory/memory.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/runtime/execution_step.dart';
@@ -33,6 +34,14 @@ class _ThrowingTool extends Tool {
   Future<Result> execute(ToolContext context) async {
     throw StateError('tool boom');
   }
+}
+
+class _FakeMemory extends Memory {
+  @override
+  Future<Result> store() async => Result.success('stored');
+
+  @override
+  Future<Result> retrieve() async => Result.success('retrieved');
 }
 
 class _CapturingTool extends Tool {
@@ -323,5 +332,17 @@ void main() {
 
     expect(tool.capturedContext, isNotNull);
     expect(tool.capturedContext!.toolId, 'capturing-tool');
+  });
+
+  test('Memory exposes store() and retrieve() returning a Result', () async {
+    final memory = _FakeMemory();
+
+    final storeResult = await memory.store();
+    final retrieveResult = await memory.retrieve();
+
+    expect(storeResult.success, isTrue);
+    expect(storeResult.message, 'stored');
+    expect(retrieveResult.success, isTrue);
+    expect(retrieveResult.message, 'retrieved');
   });
 }
