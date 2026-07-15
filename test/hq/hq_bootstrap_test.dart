@@ -40,6 +40,31 @@ class _ThrowingEmployeeFactory extends EmployeeFactory {
   }
 }
 
+class _CapturingEmployeeFactory extends EmployeeFactory {
+  _CapturingEmployeeFactory()
+    : super(
+        knowledgeRepository: KnowledgeRepository(
+          parser: MarkdownKnowledgeParser(),
+        ),
+        promptRepository: PromptRepository(parser: MarkdownPromptParser()),
+      );
+
+  final List<EmployeeRuntime> created = [];
+
+  @override
+  Future<EmployeeRuntime> create({
+    required EmployeeDefinition definition,
+    required Directory employeeDirectory,
+  }) async {
+    final runtime = await super.create(
+      definition: definition,
+      employeeDirectory: employeeDirectory,
+    );
+    created.add(runtime);
+    return runtime;
+  }
+}
+
 void _writeEmployeeMd(
   Directory employeeDir, {
   required String id,
@@ -290,4 +315,94 @@ void main() {
 
     expect(result.success, isFalse);
   });
+
+  test(
+    'boot() assembles a full EmployeeRuntime through EmployeeRepository -> '
+    'LoadedEmployee -> EmployeeFactory',
+    () async {
+      final employeeDir = Directory('${tempDir.path}/employees/marketing');
+      _writeEmployeeMd(
+        employeeDir,
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      Directory('${employeeDir.path}/knowledge').createSync();
+      File('${employeeDir.path}/knowledge/onboarding.md').writeAsStringSync(
+        '# Onboarding Guide\n\nWelcome.',
+      );
+      Directory('${employeeDir.path}/prompts').createSync();
+      File(
+        '${employeeDir.path}/prompts/marketing.md',
+      ).writeAsStringSync('You are a marketing employee.');
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
+
+      final factory = _CapturingEmployeeFactory();
+
+      final result = await _bootstrap(
+        employeeFactory: factory,
+      ).boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isTrue);
+      expect(factory.created, hasLength(1));
+      expect(factory.created.first.definition.id, 'marketing');
+      expect(factory.created.first.knowledge, hasLength(1));
+      expect(factory.created.first.knowledge.first.title, 'Onboarding Guide');
+      expect(factory.created.first.prompts, hasLength(1));
+      expect(
+        factory.created.first.prompts.first.content,
+        'You are a marketing employee.',
+      );
+    },
+  );
+
+  test(
+    'boot() succeeds for multiple employees each with their own '
+    'employee.md, knowledge document, and prompt document',
+    () async {
+      for (final id in ['marketing', 'engineering']) {
+        final employeeDir = Directory('${tempDir.path}/employees/$id');
+        _writeEmployeeMd(employeeDir, id: id, name: '$id Employee', role: id);
+        Directory('${employeeDir.path}/knowledge').createSync();
+        File(
+          '${employeeDir.path}/knowledge/onboarding.md',
+        ).writeAsStringSync('# Onboarding Guide\n\nWelcome, $id.');
+        Directory('${employeeDir.path}/prompts').createSync();
+        File(
+          '${employeeDir.path}/prompts/$id.md',
+        ).writeAsStringSync('You are a $id employee.');
+      }
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
+
+      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isTrue);
+    },
+  );
+
+  test(
+    'boot() returns Result.failure when a prompt file cannot be read',
+    () async {
+      final employeeDir = Directory('${tempDir.path}/employees/marketing');
+      _writeEmployeeMd(
+        employeeDir,
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      Directory('${employeeDir.path}/knowledge').createSync();
+      Directory('${employeeDir.path}/prompts').createSync();
+      final promptFile = File('${employeeDir.path}/prompts/marketing.md')
+        ..writeAsStringSync('You are a marketing employee.');
+      Process.runSync('chmod', ['000', promptFile.path]);
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
+
+      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isFalse);
+    },
+  );
 }
