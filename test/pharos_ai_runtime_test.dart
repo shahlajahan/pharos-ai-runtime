@@ -11,6 +11,7 @@ import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/runtime/execution_step.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:pharos_ai_runtime/tooling/tool.dart';
+import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
 
 class _FakeTool extends Tool {
@@ -228,5 +229,19 @@ void main() {
     expect(tool.id, 'fake-tool');
     expect(result.success, isTrue);
     expect(result.message, 'executed');
+  });
+
+  test('ToolRegistry defaults to empty and resolves nothing', () {
+    const registry = ToolRegistry();
+
+    expect(registry.find('fake-tool'), isNull);
+  });
+
+  test('ToolRegistry resolves a Tool registered via constructor injection', () {
+    final tool = _FakeTool();
+    final registry = ToolRegistry(tools: {tool.id: tool});
+
+    expect(registry.find('fake-tool'), same(tool));
+    expect(registry.find('missing'), isNull);
   });
 }
