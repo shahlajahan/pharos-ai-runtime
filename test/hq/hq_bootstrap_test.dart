@@ -11,12 +11,32 @@ import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
+import 'package:pharos_ai_runtime/prompts/prompt_definition.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:test/test.dart';
 
 class _EmployeeDiscoveryWithMissingEmployee extends EmployeeDiscovery {
   @override
   Future<List<String>> discover(HQSource source) async => ['ghost-employee'];
+}
+
+class _PromptRepositoryWithMissingFile extends PromptRepository {
+  _PromptRepositoryWithMissingFile() : super(parser: MarkdownPromptParser());
+
+  @override
+  Future<List<PromptDefinition>> load(Directory promptsDirectory) async {
+    throw const FileSystemException('Prompt file not found.');
+  }
+}
+
+class _PromptRepositoryWithUnreadableFile extends PromptRepository {
+  _PromptRepositoryWithUnreadableFile()
+    : super(parser: MarkdownPromptParser());
+
+  @override
+  Future<List<PromptDefinition>> load(Directory promptsDirectory) async {
+    throw const FileSystemException('Prompt file is not readable.');
+  }
 }
 
 void _writeEmployeeMd(
@@ -33,7 +53,10 @@ role: $role
 ''');
 }
 
-HQBootstrap _bootstrap({EmployeeDiscovery? discovery}) => HQBootstrap(
+HQBootstrap _bootstrap({
+  EmployeeDiscovery? discovery,
+  PromptRepository? promptRepository,
+}) => HQBootstrap(
   validator: HQValidator(),
   repository: EmployeeRepository(
     discovery: discovery ?? EmployeeDiscovery(),
@@ -41,7 +64,8 @@ HQBootstrap _bootstrap({EmployeeDiscovery? discovery}) => HQBootstrap(
     parser: MarkdownEmployeeParser(),
   ),
   knowledgeRepository: KnowledgeRepository(parser: MarkdownKnowledgeParser()),
-  promptRepository: PromptRepository(parser: MarkdownPromptParser()),
+  promptRepository:
+      promptRepository ?? PromptRepository(parser: MarkdownPromptParser()),
 );
 
 void main() {
@@ -251,6 +275,126 @@ void main() {
       final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
       expect(result.success, isFalse);
+    },
+  );
+
+  test(
+    'boot() succeeds for a valid HQ with an employee, knowledge, and an '
+    'empty prompts directory',
+    () async {
+      _writeEmployeeMd(
+        Directory('${tempDir.path}/employees/marketing'),
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      Directory('${tempDir.path}/knowledge').createSync();
+      File('${tempDir.path}/knowledge/onboarding.md').writeAsStringSync(
+        '# Onboarding Guide\n\nWelcome.',
+      );
+      Directory('${tempDir.path}/prompts').createSync();
+
+      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isTrue);
+    },
+  );
+
+  test('boot() succeeds when a prompt file is empty', () async {
+    _writeEmployeeMd(
+      Directory('${tempDir.path}/employees/marketing'),
+      id: 'marketing',
+      name: 'Marketing Employee',
+      role: 'Marketing',
+    );
+    Directory('${tempDir.path}/knowledge').createSync();
+    Directory('${tempDir.path}/prompts').createSync();
+    File('${tempDir.path}/prompts/marketing.md').writeAsStringSync('');
+
+    final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+    expect(result.success, isTrue);
+  });
+
+  test(
+    'boot() returns Result.failure when a prompt file is missing',
+    () async {
+      _writeEmployeeMd(
+        Directory('${tempDir.path}/employees/marketing'),
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
+
+      final bootstrap = _bootstrap(
+        promptRepository: _PromptRepositoryWithMissingFile(),
+      );
+
+      final result = await bootstrap.boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isFalse);
+    },
+  );
+
+  test(
+    'boot() returns Result.failure when a prompt file is unreadable',
+    () async {
+      _writeEmployeeMd(
+        Directory('${tempDir.path}/employees/marketing'),
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
+
+      final bootstrap = _bootstrap(
+        promptRepository: _PromptRepositoryWithUnreadableFile(),
+      );
+
+      final result = await bootstrap.boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isFalse);
+    },
+  );
+
+  test(
+    'boot() succeeds and exercises every repository together',
+    () async {
+      _writeEmployeeMd(
+        Directory('${tempDir.path}/employees/marketing'),
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      _writeEmployeeMd(
+        Directory('${tempDir.path}/employees/engineering'),
+        id: 'engineering',
+        name: 'Engineering Employee',
+        role: 'Engineering',
+      );
+
+      Directory('${tempDir.path}/knowledge').createSync();
+      File('${tempDir.path}/knowledge/onboarding.md').writeAsStringSync(
+        '# Onboarding Guide\n\nWelcome.',
+      );
+      File('${tempDir.path}/knowledge/culture.md').writeAsStringSync(
+        '# Culture\n\nWe move fast.',
+      );
+
+      Directory('${tempDir.path}/prompts').createSync();
+      File('${tempDir.path}/prompts/marketing.md').writeAsStringSync(
+        'You are a marketing employee.',
+      );
+      File('${tempDir.path}/prompts/engineering.md').writeAsStringSync(
+        'You are an engineering employee.',
+      );
+
+      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isTrue);
     },
   );
 }
