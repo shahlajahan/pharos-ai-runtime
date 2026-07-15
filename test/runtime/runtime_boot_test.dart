@@ -67,10 +67,12 @@ void main() {
     final runtime = Runtime(
       registry: _SpyAgentRegistry(agent),
       bootstrap: _SucceedingBootstrap(),
-      source: _PlaceholderHQSource(),
     );
 
-    final result = await runtime.run(['spy']);
+    final result = await runtime.run(
+      ['spy'],
+      source: _PlaceholderHQSource(),
+    );
 
     expect(agent.executed, isTrue);
     expect(result, isNotNull);
@@ -82,10 +84,12 @@ void main() {
     final runtime = Runtime(
       registry: _SpyAgentRegistry(agent),
       bootstrap: _FailingBootstrap(),
-      source: _PlaceholderHQSource(),
     );
 
-    final result = await runtime.run(['spy']);
+    final result = await runtime.run(
+      ['spy'],
+      source: _PlaceholderHQSource(),
+    );
 
     expect(agent.executed, isFalse);
     expect(result, isNotNull);

@@ -12,20 +12,17 @@ class Runtime {
     AgentRegistry? registry,
     Logger logger = const Logger(),
     HQBootstrap? bootstrap,
-    HQSource? source,
   }) : _registry = registry ?? AgentRegistry(),
        _logger = logger,
        _pipeline = ExecutionPipeline(config: config, logger: logger),
-       _bootstrap = bootstrap,
-       _source = source;
+       _bootstrap = bootstrap;
 
   final AgentRegistry _registry;
   final Logger _logger;
   final ExecutionPipeline _pipeline;
   final HQBootstrap? _bootstrap;
-  final HQSource? _source;
 
-  Future<Result?> run(List<String> args) async {
+  Future<Result?> run(List<String> args, {HQSource? source}) async {
     if (args.isEmpty) {
       _logger.info('Usage:');
       _logger.info('pharos marketing');
@@ -39,8 +36,8 @@ class Runtime {
       return null;
     }
 
-    if (_bootstrap != null && _source != null) {
-      final bootResult = await _bootstrap.boot(_source);
+    if (_bootstrap != null && source != null) {
+      final bootResult = await _bootstrap.boot(source);
 
       if (!bootResult.success) {
         return bootResult;
