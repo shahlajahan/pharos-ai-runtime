@@ -9,6 +9,8 @@ import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
+import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
+import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
 
@@ -20,6 +22,7 @@ HQBootstrap _realBootstrap() => HQBootstrap(
     parser: MarkdownEmployeeParser(),
   ),
   knowledgeRepository: KnowledgeRepository(parser: MarkdownKnowledgeParser()),
+  promptRepository: PromptRepository(parser: MarkdownPromptParser()),
 );
 
 void main() {
@@ -40,6 +43,7 @@ void main() {
     () async {
       Directory('${tempDir.path}/employees').createSync();
       Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
 
       final runtime = Runtime(bootstrap: _realBootstrap());
 

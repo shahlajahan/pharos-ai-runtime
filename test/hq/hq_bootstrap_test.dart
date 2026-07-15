@@ -10,6 +10,8 @@ import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
+import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
+import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:test/test.dart';
 
 class _EmployeeDiscoveryWithMissingEmployee extends EmployeeDiscovery {
@@ -39,6 +41,7 @@ HQBootstrap _bootstrap({EmployeeDiscovery? discovery}) => HQBootstrap(
     parser: MarkdownEmployeeParser(),
   ),
   knowledgeRepository: KnowledgeRepository(parser: MarkdownKnowledgeParser()),
+  promptRepository: PromptRepository(parser: MarkdownPromptParser()),
 );
 
 void main() {
@@ -63,6 +66,7 @@ void main() {
   test('boot() succeeds for an empty but valid HQ', () async {
     Directory('${tempDir.path}/employees').createSync();
     Directory('${tempDir.path}/knowledge').createSync();
+    Directory('${tempDir.path}/prompts').createSync();
 
     final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
@@ -71,6 +75,7 @@ void main() {
 
   test('boot() succeeds for an HQ with multiple employees', () async {
     Directory('${tempDir.path}/knowledge').createSync();
+    Directory('${tempDir.path}/prompts').createSync();
     _writeEmployeeMd(
       Directory('${tempDir.path}/employees/marketing'),
       id: 'marketing',
@@ -94,6 +99,7 @@ void main() {
     () async {
       Directory('${tempDir.path}/employees').createSync();
       Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
 
       final bootstrap = _bootstrap(
         discovery: _EmployeeDiscoveryWithMissingEmployee(),
@@ -108,6 +114,7 @@ void main() {
   test('boot() succeeds for an HQ with valid knowledge documents', () async {
     Directory('${tempDir.path}/employees').createSync();
     Directory('${tempDir.path}/knowledge').createSync();
+    Directory('${tempDir.path}/prompts').createSync();
     File('${tempDir.path}/knowledge/onboarding.md').writeAsStringSync(
       '# Onboarding Guide\n\nWelcome.',
     );
@@ -122,6 +129,7 @@ void main() {
     () async {
       Directory('${tempDir.path}/employees').createSync();
       Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
       File(
         '${tempDir.path}/knowledge/broken.md',
       ).writeAsStringSync('No heading here.');
@@ -142,6 +150,7 @@ void main() {
         role: 'Marketing',
       );
       Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
       File('${tempDir.path}/knowledge/onboarding.md').writeAsStringSync(
         '# Onboarding Guide\n\nWelcome.',
       );
@@ -152,39 +161,35 @@ void main() {
     },
   );
 
-  test(
-    'boot() succeeds when the knowledge directory is empty',
-    () async {
-      _writeEmployeeMd(
-        Directory('${tempDir.path}/employees/marketing'),
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      );
-      Directory('${tempDir.path}/knowledge').createSync();
+  test('boot() succeeds when the knowledge directory is empty', () async {
+    _writeEmployeeMd(
+      Directory('${tempDir.path}/employees/marketing'),
+      id: 'marketing',
+      name: 'Marketing Employee',
+      role: 'Marketing',
+    );
+    Directory('${tempDir.path}/knowledge').createSync();
+    Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+    final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isTrue);
-    },
-  );
+    expect(result.success, isTrue);
+  });
 
-  test(
-    'boot() returns Result.failure for a broken employee.md',
-    () async {
-      Directory('${tempDir.path}/employees/marketing').createSync(
-        recursive: true,
-      );
-      File(
-        '${tempDir.path}/employees/marketing/employee.md',
-      ).writeAsStringSync('id: marketing\nname: Marketing Employee\n');
-      Directory('${tempDir.path}/knowledge').createSync();
+  test('boot() returns Result.failure for a broken employee.md', () async {
+    Directory(
+      '${tempDir.path}/employees/marketing',
+    ).createSync(recursive: true);
+    File(
+      '${tempDir.path}/employees/marketing/employee.md',
+    ).writeAsStringSync('id: marketing\nname: Marketing Employee\n');
+    Directory('${tempDir.path}/knowledge').createSync();
+    Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+    final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isFalse);
-    },
-  );
+    expect(result.success, isFalse);
+  });
 
   test(
     'boot() returns Result.failure for a broken knowledge markdown document',
@@ -196,9 +201,52 @@ void main() {
         role: 'Marketing',
       );
       Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
       File(
         '${tempDir.path}/knowledge/broken.md',
       ).writeAsStringSync('No heading in this document.');
+
+      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isFalse);
+    },
+  );
+
+  test(
+    'boot() succeeds for a valid HQ with employees, knowledge, and prompts',
+    () async {
+      _writeEmployeeMd(
+        Directory('${tempDir.path}/employees/marketing'),
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      Directory('${tempDir.path}/knowledge').createSync();
+      File('${tempDir.path}/knowledge/onboarding.md').writeAsStringSync(
+        '# Onboarding Guide\n\nWelcome.',
+      );
+      Directory('${tempDir.path}/prompts').createSync();
+      File(
+        '${tempDir.path}/prompts/marketing.md',
+      ).writeAsStringSync('You are a marketing employee.');
+
+      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+      expect(result.success, isTrue);
+    },
+  );
+
+  test(
+    'boot() returns Result.failure when the prompts directory cannot be loaded',
+    () async {
+      _writeEmployeeMd(
+        Directory('${tempDir.path}/employees/marketing'),
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      Directory('${tempDir.path}/knowledge').createSync();
+      // prompts/ is intentionally never created.
 
       final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
 

@@ -8,6 +8,8 @@ import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
+import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
+import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 
 void main(List<String> arguments) async {
@@ -28,6 +30,7 @@ void main(List<String> arguments) async {
         knowledgeRepository: KnowledgeRepository(
           parser: MarkdownKnowledgeParser(),
         ),
+        promptRepository: PromptRepository(parser: MarkdownPromptParser()),
       );
       i++;
     } else {

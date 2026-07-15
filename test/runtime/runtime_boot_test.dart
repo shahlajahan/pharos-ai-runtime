@@ -10,6 +10,8 @@ import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
+import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
+import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
@@ -28,12 +30,16 @@ EmployeeRepository _realRepository() => EmployeeRepository(
 KnowledgeRepository _realKnowledgeRepository() =>
     KnowledgeRepository(parser: MarkdownKnowledgeParser());
 
+PromptRepository _realPromptRepository() =>
+    PromptRepository(parser: MarkdownPromptParser());
+
 class _SucceedingBootstrap extends HQBootstrap {
   _SucceedingBootstrap()
     : super(
         validator: HQValidator(),
         repository: _realRepository(),
         knowledgeRepository: _realKnowledgeRepository(),
+        promptRepository: _realPromptRepository(),
       );
 
   @override
@@ -46,6 +52,7 @@ class _FailingBootstrap extends HQBootstrap {
         validator: HQValidator(),
         repository: _realRepository(),
         knowledgeRepository: _realKnowledgeRepository(),
+        promptRepository: _realPromptRepository(),
       );
 
   @override
