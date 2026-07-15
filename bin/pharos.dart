@@ -1,3 +1,5 @@
+import 'package:pharos_ai_runtime/employees/employee_repository.dart';
+import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
 import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
@@ -16,8 +18,11 @@ void main(List<String> arguments) async {
       source = LocalHQSource(arguments[i + 1]);
       bootstrap = HQBootstrap(
         validator: HQValidator(),
-        discovery: EmployeeDiscovery(),
-        loader: EmployeeLoader(),
+        repository: EmployeeRepository(
+          discovery: EmployeeDiscovery(),
+          loader: EmployeeLoader(),
+          parser: MarkdownEmployeeParser(),
+        ),
       );
       i++;
     } else {

@@ -1,6 +1,8 @@
 import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/employees/employee_repository.dart';
+import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
 import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
@@ -15,13 +17,15 @@ class _PlaceholderHQSource extends HQSource {
   Future<String> rootPath() async => '/placeholder/hq';
 }
 
+EmployeeRepository _realRepository() => EmployeeRepository(
+  discovery: EmployeeDiscovery(),
+  loader: EmployeeLoader(),
+  parser: MarkdownEmployeeParser(),
+);
+
 class _SucceedingBootstrap extends HQBootstrap {
   _SucceedingBootstrap()
-    : super(
-        validator: HQValidator(),
-        discovery: EmployeeDiscovery(),
-        loader: EmployeeLoader(),
-      );
+    : super(validator: HQValidator(), repository: _realRepository());
 
   @override
   Future<Result> boot(HQSource source) async => Result.success('booted');
@@ -29,11 +33,7 @@ class _SucceedingBootstrap extends HQBootstrap {
 
 class _FailingBootstrap extends HQBootstrap {
   _FailingBootstrap()
-    : super(
-        validator: HQValidator(),
-        discovery: EmployeeDiscovery(),
-        loader: EmployeeLoader(),
-      );
+    : super(validator: HQValidator(), repository: _realRepository());
 
   @override
   Future<Result> boot(HQSource source) async => Result.failure('boot failed');

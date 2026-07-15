@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:pharos_ai_runtime/employees/employee_repository.dart';
+import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
 import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
@@ -13,10 +15,27 @@ class _EmployeeDiscoveryWithMissingEmployee extends EmployeeDiscovery {
   Future<List<String>> discover(HQSource source) async => ['ghost-employee'];
 }
 
+void _writeEmployeeMd(
+  Directory employeeDir, {
+  required String id,
+  required String name,
+  required String role,
+}) {
+  employeeDir.createSync(recursive: true);
+  File('${employeeDir.path}/employee.md').writeAsStringSync('''
+id: $id
+name: $name
+role: $role
+''');
+}
+
 HQBootstrap _bootstrap({EmployeeDiscovery? discovery}) => HQBootstrap(
   validator: HQValidator(),
-  discovery: discovery ?? EmployeeDiscovery(),
-  loader: EmployeeLoader(),
+  repository: EmployeeRepository(
+    discovery: discovery ?? EmployeeDiscovery(),
+    loader: EmployeeLoader(),
+    parser: MarkdownEmployeeParser(),
+  ),
 );
 
 void main() {
@@ -48,11 +67,19 @@ void main() {
   });
 
   test('boot() succeeds for an HQ with multiple employees', () async {
-    Directory('${tempDir.path}/employees/marketing').createSync(
-      recursive: true,
-    );
-    Directory('${tempDir.path}/employees/engineering').createSync();
     Directory('${tempDir.path}/knowledge').createSync();
+    _writeEmployeeMd(
+      Directory('${tempDir.path}/employees/marketing'),
+      id: 'marketing',
+      name: 'Marketing Employee',
+      role: 'Marketing',
+    );
+    _writeEmployeeMd(
+      Directory('${tempDir.path}/employees/engineering'),
+      id: 'engineering',
+      name: 'Engineering Employee',
+      role: 'Engineering',
+    );
 
     final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
 

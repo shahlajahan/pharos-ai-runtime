@@ -1,21 +1,17 @@
 import 'package:pharos_ai_runtime/core/result.dart';
-import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
-import 'package:pharos_ai_runtime/hq/employee_loader.dart';
+import 'package:pharos_ai_runtime/employees/employee_repository.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 
 class HQBootstrap {
   HQBootstrap({
     required HQValidator validator,
-    required EmployeeDiscovery discovery,
-    required EmployeeLoader loader,
+    required EmployeeRepository repository,
   }) : _validator = validator,
-       _discovery = discovery,
-       _loader = loader;
+       _repository = repository;
 
   final HQValidator _validator;
-  final EmployeeDiscovery _discovery;
-  final EmployeeLoader _loader;
+  final EmployeeRepository _repository;
 
   Future<Result> boot(HQSource source) async {
     final validation = await _validator.validate(source);
@@ -24,14 +20,10 @@ class HQBootstrap {
       return validation;
     }
 
-    final employeeIds = await _discovery.discover(source);
-
-    for (final employeeId in employeeIds) {
-      final employeeDirectory = await _loader.load(source, employeeId);
-
-      if (employeeDirectory == null) {
-        return Result.failure('Employee "$employeeId" could not be loaded.');
-      }
+    try {
+      await _repository.load(source);
+    } catch (e) {
+      return Result.failure('Failed to load employees: $e');
     }
 
     return Result.success('HQ bootstrapped successfully.');

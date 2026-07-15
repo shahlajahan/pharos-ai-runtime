@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:pharos_ai_runtime/employees/employee_repository.dart';
+import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
 import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
@@ -10,8 +12,11 @@ import 'package:test/test.dart';
 
 HQBootstrap _realBootstrap() => HQBootstrap(
   validator: HQValidator(),
-  discovery: EmployeeDiscovery(),
-  loader: EmployeeLoader(),
+  repository: EmployeeRepository(
+    discovery: EmployeeDiscovery(),
+    loader: EmployeeLoader(),
+    parser: MarkdownEmployeeParser(),
+  ),
 );
 
 void main() {
