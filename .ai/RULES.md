@@ -22,3 +22,12 @@ unless explicitly requested.
 The implementation agent must never decide what to work on next.
 
 After a successful commit, stop immediately.
+
+Planning is required only when the task introduces:
+
+- a new subsystem
+- architectural changes
+- more than three modified files
+- new public APIs
+
+Otherwise, implement directly.

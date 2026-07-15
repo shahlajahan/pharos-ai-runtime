@@ -1,17 +1,55 @@
 # AI Development Loop
 
-1. Read RULES.md
-2. Read ARCHITECTURE.md
-3. Read SPRINT.md
-4. Read TASK.md
-5. Read only the source files required for the current task.
-6. Implement ONLY the current task.
-7. Run:
-   - dart analyze
-   - dart test
-   - dart run bin/pharos.dart marketing
-8. If any command fails, fix it and repeat.
-9. If all commands pass:
-   - git add .
-   - git commit
-10. Stop immediately.
+## Phase 1 — Planning
+
+1. Read:
+   - RULES.md
+   - PRODUCT.md
+   - ARCHITECTURE.md
+   - SPRINT.md
+   - TASK.md
+
+2. Read ONLY the source files required for the current task.
+
+3. Produce an implementation plan.
+
+The plan must include:
+
+- Summary
+- Files to modify
+- Design decisions
+- Potential risks
+
+Do not modify any code.
+
+Wait for approval.
+
+---
+
+## Phase 2 — Implementation
+
+1. Implement ONLY the approved plan.
+
+2. Run:
+
+- dart analyze
+- dart test
+- dart run bin/pharos.dart marketing
+
+3. If any command fails:
+
+Fix the issue.
+
+Repeat until all commands pass.
+
+4. Perform a self review.
+
+Verify:
+
+- Task requirements satisfied
+- No out-of-scope changes
+- No architecture violations
+
+5. Create exactly one commit.
+
+6. Stop immediately.
