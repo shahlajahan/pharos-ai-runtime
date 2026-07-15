@@ -8,6 +8,7 @@ import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/memory/memory.dart';
 import 'package:pharos_ai_runtime/memory/memory_context.dart';
+import 'package:pharos_ai_runtime/memory/memory_invoker.dart';
 import 'package:pharos_ai_runtime/memory/memory_registry.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
@@ -46,6 +47,34 @@ class _FakeMemory extends Memory {
   @override
   Future<Result> retrieve(MemoryContext context) async =>
       Result.success('retrieved');
+}
+
+class _ThrowingMemory extends Memory {
+  @override
+  Future<Result> store(MemoryContext context) async {
+    throw StateError('memory boom');
+  }
+
+  @override
+  Future<Result> retrieve(MemoryContext context) async {
+    throw StateError('memory boom');
+  }
+}
+
+class _CapturingMemory extends Memory {
+  MemoryContext? capturedContext;
+
+  @override
+  Future<Result> store(MemoryContext context) async {
+    capturedContext = context;
+    return Result.success('stored');
+  }
+
+  @override
+  Future<Result> retrieve(MemoryContext context) async {
+    capturedContext = context;
+    return Result.success('retrieved');
+  }
 }
 
 class _CapturingTool extends Tool {
@@ -376,4 +405,67 @@ void main() {
       expect(registry.find('missing'), isNull);
     },
   );
+
+  test(
+    'MemoryInvoker invokes a registered Memory\'s store() and retrieve()',
+    () async {
+      final memory = _FakeMemory();
+      final invoker = MemoryInvoker(
+        registry: MemoryRegistry(memories: {'memory-1': memory}),
+      );
+
+      final storeResult = await invoker.store('memory-1');
+      final retrieveResult = await invoker.retrieve('memory-1');
+
+      expect(storeResult.success, isTrue);
+      expect(storeResult.message, 'stored');
+      expect(retrieveResult.success, isTrue);
+      expect(retrieveResult.message, 'retrieved');
+    },
+  );
+
+  test(
+    'MemoryInvoker returns Result.failure for an unknown memory key',
+    () async {
+      final invoker = MemoryInvoker(registry: const MemoryRegistry());
+
+      final storeResult = await invoker.store('missing');
+      final retrieveResult = await invoker.retrieve('missing');
+
+      expect(storeResult.success, isFalse);
+      expect(storeResult.message, contains('missing'));
+      expect(retrieveResult.success, isFalse);
+      expect(retrieveResult.message, contains('missing'));
+    },
+  );
+
+  test(
+    'MemoryInvoker catches memory exceptions and returns Result.failure',
+    () async {
+      final memory = _ThrowingMemory();
+      final invoker = MemoryInvoker(
+        registry: MemoryRegistry(memories: {'memory-1': memory}),
+      );
+
+      final storeResult = await invoker.store('memory-1');
+      final retrieveResult = await invoker.retrieve('memory-1');
+
+      expect(storeResult.success, isFalse);
+      expect(storeResult.message, contains('memory boom'));
+      expect(retrieveResult.success, isFalse);
+      expect(retrieveResult.message, contains('memory boom'));
+    },
+  );
+
+  test('MemoryInvoker passes a MemoryContext with the invoked key', () async {
+    final memory = _CapturingMemory();
+    final invoker = MemoryInvoker(
+      registry: MemoryRegistry(memories: {'memory-1': memory}),
+    );
+
+    await invoker.retrieve('memory-1');
+
+    expect(memory.capturedContext, isNotNull);
+    expect(memory.capturedContext!.key, 'memory-1');
+  });
 }
