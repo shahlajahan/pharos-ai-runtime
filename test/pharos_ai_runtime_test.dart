@@ -11,6 +11,7 @@ import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/runtime/execution_step.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:pharos_ai_runtime/tooling/tool.dart';
+import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
 
@@ -20,6 +21,16 @@ class _FakeTool extends Tool {
 
   @override
   Future<Result> execute() async => Result.success('executed');
+}
+
+class _ThrowingTool extends Tool {
+  @override
+  String get id => 'throwing-tool';
+
+  @override
+  Future<Result> execute() async {
+    throw StateError('tool boom');
+  }
 }
 
 class _ThrowingAgent extends Agent {
@@ -244,4 +255,40 @@ void main() {
     expect(registry.find('fake-tool'), same(tool));
     expect(registry.find('missing'), isNull);
   });
+
+  test('ToolInvoker invokes a registered tool and returns its Result', () async {
+    final tool = _FakeTool();
+    final invoker = ToolInvoker(
+      registry: ToolRegistry(tools: {tool.id: tool}),
+    );
+
+    final result = await invoker.invoke('fake-tool');
+
+    expect(result.success, isTrue);
+    expect(result.message, 'executed');
+  });
+
+  test('ToolInvoker returns Result.failure for an unknown tool id', () async {
+    final invoker = ToolInvoker(registry: const ToolRegistry());
+
+    final result = await invoker.invoke('missing');
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('missing'));
+  });
+
+  test(
+    'ToolInvoker catches tool exceptions and returns Result.failure',
+    () async {
+      final tool = _ThrowingTool();
+      final invoker = ToolInvoker(
+        registry: ToolRegistry(tools: {tool.id: tool}),
+      );
+
+      final result = await invoker.invoke('throwing-tool');
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('tool boom'));
+    },
+  );
 }
