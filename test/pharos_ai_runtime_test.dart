@@ -414,8 +414,8 @@ void main() {
         registry: MemoryRegistry(memories: {'memory-1': memory}),
       );
 
-      final storeResult = await invoker.store('memory-1');
-      final retrieveResult = await invoker.retrieve('memory-1');
+      final storeResult = await invoker.store('memory-1', 'key-1');
+      final retrieveResult = await invoker.retrieve('memory-1', 'key-1');
 
       expect(storeResult.success, isTrue);
       expect(storeResult.message, 'stored');
@@ -425,12 +425,12 @@ void main() {
   );
 
   test(
-    'MemoryInvoker returns Result.failure for an unknown memory key',
+    'MemoryInvoker returns Result.failure for an unknown memory id',
     () async {
       final invoker = MemoryInvoker(registry: const MemoryRegistry());
 
-      final storeResult = await invoker.store('missing');
-      final retrieveResult = await invoker.retrieve('missing');
+      final storeResult = await invoker.store('missing', 'key-1');
+      final retrieveResult = await invoker.retrieve('missing', 'key-1');
 
       expect(storeResult.success, isFalse);
       expect(storeResult.message, contains('missing'));
@@ -447,8 +447,8 @@ void main() {
         registry: MemoryRegistry(memories: {'memory-1': memory}),
       );
 
-      final storeResult = await invoker.store('memory-1');
-      final retrieveResult = await invoker.retrieve('memory-1');
+      final storeResult = await invoker.store('memory-1', 'key-1');
+      final retrieveResult = await invoker.retrieve('memory-1', 'key-1');
 
       expect(storeResult.success, isFalse);
       expect(storeResult.message, contains('memory boom'));
@@ -457,15 +457,30 @@ void main() {
     },
   );
 
-  test('MemoryInvoker passes a MemoryContext with the invoked key', () async {
+  test('MemoryInvoker passes a MemoryContext with the given key', () async {
     final memory = _CapturingMemory();
     final invoker = MemoryInvoker(
       registry: MemoryRegistry(memories: {'memory-1': memory}),
     );
 
-    await invoker.retrieve('memory-1');
+    await invoker.retrieve('memory-1', 'key-1');
 
     expect(memory.capturedContext, isNotNull);
-    expect(memory.capturedContext!.key, 'memory-1');
+    expect(memory.capturedContext!.key, 'key-1');
   });
+
+  test(
+    'MemoryInvoker resolves the Memory by memoryId, independent of key',
+    () async {
+      final memory = _CapturingMemory();
+      final invoker = MemoryInvoker(
+        registry: MemoryRegistry(memories: {'memory-1': memory}),
+      );
+
+      final result = await invoker.store('memory-1', 'unrelated-key');
+
+      expect(result.success, isTrue);
+      expect(memory.capturedContext!.key, 'unrelated-key');
+    },
+  );
 }
