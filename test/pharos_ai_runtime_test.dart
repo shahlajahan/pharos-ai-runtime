@@ -8,6 +8,7 @@ import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/memory/memory.dart';
 import 'package:pharos_ai_runtime/memory/memory_context.dart';
+import 'package:pharos_ai_runtime/memory/memory_registry.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/runtime/execution_step.dart';
@@ -358,4 +359,21 @@ void main() {
 
     expect(context.key, 'key-1');
   });
+
+  test('MemoryRegistry defaults to empty and resolves nothing', () {
+    const registry = MemoryRegistry();
+
+    expect(registry.find('memory-1'), isNull);
+  });
+
+  test(
+    'MemoryRegistry resolves a Memory registered via constructor injection',
+    () {
+      final memory = _FakeMemory();
+      final registry = MemoryRegistry(memories: {'memory-1': memory});
+
+      expect(registry.find('memory-1'), same(memory));
+      expect(registry.find('missing'), isNull);
+    },
+  );
 }
