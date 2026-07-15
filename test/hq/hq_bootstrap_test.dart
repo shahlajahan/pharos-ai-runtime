@@ -64,7 +64,6 @@ HQBootstrap _bootstrap({
     loader: EmployeeLoader(),
     parser: MarkdownEmployeeParser(),
   ),
-  loader: EmployeeLoader(),
   employeeFactory:
       employeeFactory ??
       EmployeeFactory(

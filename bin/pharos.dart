@@ -28,7 +28,6 @@ void main(List<String> arguments) async {
           loader: EmployeeLoader(),
           parser: MarkdownEmployeeParser(),
         ),
-        loader: EmployeeLoader(),
         employeeFactory: EmployeeFactory(
           knowledgeRepository: KnowledgeRepository(
             parser: MarkdownKnowledgeParser(),

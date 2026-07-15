@@ -38,7 +38,6 @@ class _SucceedingBootstrap extends HQBootstrap {
     : super(
         validator: HQValidator(),
         repository: _realRepository(),
-        loader: EmployeeLoader(),
         employeeFactory: _realEmployeeFactory(),
       );
 
@@ -51,7 +50,6 @@ class _FailingBootstrap extends HQBootstrap {
     : super(
         validator: HQValidator(),
         repository: _realRepository(),
-        loader: EmployeeLoader(),
         employeeFactory: _realEmployeeFactory(),
       );
 

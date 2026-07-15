@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:pharos_ai_runtime/employees/employee_definition.dart';
+import 'package:pharos_ai_runtime/employees/loaded_employee.dart';
 import 'package:pharos_ai_runtime/employees/employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
 import 'package:pharos_ai_runtime/hq/employee_loader.dart';
@@ -19,9 +19,9 @@ class EmployeeRepository {
   final EmployeeLoader _loader;
   final EmployeeParser _parser;
 
-  Future<List<EmployeeDefinition>> load(HQSource source) async {
+  Future<List<LoadedEmployee>> load(HQSource source) async {
     final employeeIds = await _discovery.discover(source);
-    final definitions = <EmployeeDefinition>[];
+    final loaded = <LoadedEmployee>[];
 
     for (final employeeId in employeeIds) {
       final directory = await _loader.load(source, employeeId);
@@ -32,9 +32,11 @@ class EmployeeRepository {
         );
       }
 
-      definitions.add(await _parser.parse(directory));
+      final definition = await _parser.parse(directory);
+
+      loaded.add(LoadedEmployee(definition: definition, directory: directory));
     }
 
-    return definitions;
+    return loaded;
   }
 }

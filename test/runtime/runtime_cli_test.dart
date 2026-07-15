@@ -22,7 +22,6 @@ HQBootstrap _realBootstrap() => HQBootstrap(
     loader: EmployeeLoader(),
     parser: MarkdownEmployeeParser(),
   ),
-  loader: EmployeeLoader(),
   employeeFactory: EmployeeFactory(
     knowledgeRepository: KnowledgeRepository(parser: MarkdownKnowledgeParser()),
     promptRepository: PromptRepository(parser: MarkdownPromptParser()),

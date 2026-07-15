@@ -67,10 +67,27 @@ void main() {
     final result = await _repository().load(LocalHQSource(tempDir.path));
 
     expect(result, hasLength(1));
-    expect(result.first.id, 'marketing');
-    expect(result.first.name, 'Marketing Employee');
-    expect(result.first.role, 'Marketing');
+    expect(result.first.definition.id, 'marketing');
+    expect(result.first.definition.name, 'Marketing Employee');
+    expect(result.first.definition.role, 'Marketing');
   });
+
+  test(
+    'load() returns the resolved Directory alongside each EmployeeDefinition',
+    () async {
+      final employeeDir = Directory('${tempDir.path}/employees/marketing');
+      _writeEmployeeMd(
+        employeeDir,
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+
+      final result = await _repository().load(LocalHQSource(tempDir.path));
+
+      expect(result.first.directory.path, employeeDir.path);
+    },
+  );
 
   test('load() returns an ordered list for multiple employees', () async {
     _writeEmployeeMd(
@@ -95,7 +112,7 @@ void main() {
     final result = await _repository().load(LocalHQSource(tempDir.path));
 
     expect(
-      result.map((definition) => definition.id).toList(),
+      result.map((employee) => employee.definition.id).toList(),
       ['engineering', 'finance', 'marketing'],
     );
   });
