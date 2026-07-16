@@ -2,6 +2,8 @@ import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
@@ -19,6 +21,19 @@ class _ThrowingAgent extends Agent {
 class _ThrowingAgentRegistry extends AgentRegistry {
   @override
   Agent? find(String id) => _ThrowingAgent();
+}
+
+class _SpyModelProvider extends MockModelProvider {
+  int callCount = 0;
+  ModelRequest? capturedRequest;
+
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async {
+    callCount++;
+    capturedRequest = request;
+
+    return super.generate(request);
+  }
 }
 
 void main() {
@@ -52,6 +67,27 @@ void main() {
       expect(result, isNotNull);
       expect(result!.success, isFalse);
       expect(result.message, contains('boom'));
+    },
+  );
+
+  test('Runtime calls modelProvider.generate() exactly once', () async {
+    final modelProvider = _SpyModelProvider();
+    final runtime = Runtime(modelProvider: modelProvider);
+
+    await runtime.run(['marketing']);
+
+    expect(modelProvider.callCount, 1);
+  });
+
+  test(
+    'Runtime calls modelProvider.generate() with a ModelRequest',
+    () async {
+      final modelProvider = _SpyModelProvider();
+      final runtime = Runtime(modelProvider: modelProvider);
+
+      await runtime.run(['marketing']);
+
+      expect(modelProvider.capturedRequest, isA<ModelRequest>());
     },
   );
 }

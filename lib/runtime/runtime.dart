@@ -48,10 +48,13 @@ class Runtime {
       }
     }
 
+    final request = _buildModelRequest();
+    // ignore: unused_local_variable
+    final response = await modelProvider.generate(request);
+
     return _pipeline.run(agent);
   }
 
-  // ignore: unused_element
   ModelRequest _buildModelRequest() {
     return const ModelRequest(systemPrompt: '', userPrompt: '');
   }
