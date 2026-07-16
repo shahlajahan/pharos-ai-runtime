@@ -1,3 +1,4 @@
+import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/openai_client.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
@@ -6,15 +7,18 @@ import 'package:test/test.dart';
 
 class _FakeOpenAIClient extends OpenAIClient {
   ModelRequest? capturedRequest;
-  OpenAIConfig? capturedConfig;
+  ModelConfig? capturedModelConfig;
+  OpenAIConfig? capturedOpenAiConfig;
 
   @override
   Future<OpenAIResult> complete(
     ModelRequest request,
-    OpenAIConfig config,
+    ModelConfig modelConfig,
+    OpenAIConfig openAiConfig,
   ) async {
     capturedRequest = request;
-    capturedConfig = config;
+    capturedModelConfig = modelConfig;
+    capturedOpenAiConfig = openAiConfig;
 
     return const OpenAIResult(text: 'Fake response');
   }
@@ -27,12 +31,13 @@ void main() {
       systemPrompt: 'You are a helpful assistant.',
       userPrompt: 'What is the capital of France?',
     );
-    const config = OpenAIConfig(
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
       baseUrl: 'https://api.openai.com/v1',
     );
 
-    final result = await client.complete(request, config);
+    final result = await client.complete(request, modelConfig, openAiConfig);
 
     expect(result.text, 'Fake response');
   });
@@ -43,29 +48,48 @@ void main() {
       systemPrompt: 'You are a helpful assistant.',
       userPrompt: 'What is the capital of France?',
     );
-    const config = OpenAIConfig(
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
       baseUrl: 'https://api.openai.com/v1',
     );
 
-    await client.complete(request, config);
+    await client.complete(request, modelConfig, openAiConfig);
 
     expect(client.capturedRequest, same(request));
   });
 
-  test('complete() passes the config through unchanged', () async {
+  test('complete() passes the modelConfig through unchanged', () async {
     final client = _FakeOpenAIClient();
     const request = ModelRequest(
       systemPrompt: 'You are a helpful assistant.',
       userPrompt: 'What is the capital of France?',
     );
-    const config = OpenAIConfig(
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
       baseUrl: 'https://api.openai.com/v1',
     );
 
-    await client.complete(request, config);
+    await client.complete(request, modelConfig, openAiConfig);
 
-    expect(client.capturedConfig, same(config));
+    expect(client.capturedModelConfig, same(modelConfig));
+  });
+
+  test('complete() passes the openAiConfig through unchanged', () async {
+    final client = _FakeOpenAIClient();
+    const request = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+    );
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1',
+    );
+
+    await client.complete(request, modelConfig, openAiConfig);
+
+    expect(client.capturedOpenAiConfig, same(openAiConfig));
   });
 }
