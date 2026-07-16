@@ -3,7 +3,7 @@ import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/core/config.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
-import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
+import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
@@ -20,7 +20,7 @@ class Runtime {
     Config config = const Config(),
     AgentRegistry? registry,
     Logger logger = const Logger(),
-    HQBootstrap? bootstrap,
+    HQBootstrapper? bootstrap,
   }) : _requestBuilder = requestBuilder,
        _responseHandler = responseHandler,
        _registry = registry ?? AgentRegistry(),
@@ -34,7 +34,7 @@ class Runtime {
   final AgentRegistry _registry;
   final Logger _logger;
   final ExecutionPipeline _pipeline;
-  final HQBootstrap? _bootstrap;
+  final HQBootstrapper? _bootstrap;
 
   Future<Result?> run(List<String> args, {HQSource? source}) async {
     if (args.isEmpty) {

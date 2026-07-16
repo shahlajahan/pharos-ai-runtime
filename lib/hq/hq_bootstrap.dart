@@ -2,12 +2,13 @@ import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/employees/employee_repository.dart';
 import 'package:pharos_ai_runtime/employees/loaded_employee.dart';
 import 'package:pharos_ai_runtime/hq/hq_boot_result.dart';
+import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 
-class HQBootstrap {
+class HQBootstrap extends HQBootstrapper {
   HQBootstrap({
     required HQValidator validator,
     required EmployeeRepository repository,
@@ -20,6 +21,7 @@ class HQBootstrap {
   final EmployeeRepository _repository;
   final EmployeeFactory _employeeFactory;
 
+  @override
   Future<HQBootResult> boot(HQSource source) async {
     final validation = await _validator.validate(source);
 

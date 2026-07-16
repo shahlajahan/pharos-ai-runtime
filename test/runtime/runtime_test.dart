@@ -2,28 +2,18 @@ import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/employees/employee_definition.dart';
-import 'package:pharos_ai_runtime/employees/employee_repository.dart';
-import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
-import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
-import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_boot_result.dart';
-import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
+import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
-import 'package:pharos_ai_runtime/hq/hq_validator.dart';
-import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
-import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
-import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
-import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
-import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
@@ -35,22 +25,8 @@ class _PlaceholderHQSource extends HQSource {
   Future<String> rootPath() async => '/placeholder/hq';
 }
 
-class _StubHQBootstrap extends HQBootstrap {
-  _StubHQBootstrap(this._employees)
-    : super(
-        validator: HQValidator(),
-        repository: EmployeeRepository(
-          discovery: EmployeeDiscovery(),
-          loader: EmployeeLoader(),
-          parser: MarkdownEmployeeParser(),
-        ),
-        employeeFactory: EmployeeFactory(
-          knowledgeRepository: KnowledgeRepository(
-            parser: MarkdownKnowledgeParser(),
-          ),
-          promptRepository: PromptRepository(parser: MarkdownPromptParser()),
-        ),
-      );
+class _StubHQBootstrap extends HQBootstrapper {
+  _StubHQBootstrap(this._employees);
 
   final List<EmployeeRuntime> _employees;
 

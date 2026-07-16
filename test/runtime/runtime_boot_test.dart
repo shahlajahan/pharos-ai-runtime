@@ -2,23 +2,13 @@ import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/employees/employee_definition.dart';
-import 'package:pharos_ai_runtime/employees/employee_repository.dart';
-import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
-import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
-import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_boot_result.dart';
-import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
+import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
-import 'package:pharos_ai_runtime/hq/hq_validator.dart';
-import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
-import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
-import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
-import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
-import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
@@ -28,25 +18,7 @@ class _PlaceholderHQSource extends HQSource {
   Future<String> rootPath() async => '/placeholder/hq';
 }
 
-EmployeeRepository _realRepository() => EmployeeRepository(
-  discovery: EmployeeDiscovery(),
-  loader: EmployeeLoader(),
-  parser: MarkdownEmployeeParser(),
-);
-
-EmployeeFactory _realEmployeeFactory() => EmployeeFactory(
-  knowledgeRepository: KnowledgeRepository(parser: MarkdownKnowledgeParser()),
-  promptRepository: PromptRepository(parser: MarkdownPromptParser()),
-);
-
-class _SucceedingBootstrap extends HQBootstrap {
-  _SucceedingBootstrap()
-    : super(
-        validator: HQValidator(),
-        repository: _realRepository(),
-        employeeFactory: _realEmployeeFactory(),
-      );
-
+class _SucceedingBootstrap extends HQBootstrapper {
   @override
   Future<HQBootResult> boot(HQSource source) async => HQBootResult(
     result: Result.success('booted'),
@@ -64,14 +36,7 @@ class _SucceedingBootstrap extends HQBootstrap {
   );
 }
 
-class _FailingBootstrap extends HQBootstrap {
-  _FailingBootstrap()
-    : super(
-        validator: HQValidator(),
-        repository: _realRepository(),
-        employeeFactory: _realEmployeeFactory(),
-      );
-
+class _FailingBootstrap extends HQBootstrapper {
   @override
   Future<HQBootResult> boot(HQSource source) async =>
       HQBootResult(result: Result.failure('boot failed'), employees: const []);
