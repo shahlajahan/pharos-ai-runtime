@@ -6,6 +6,7 @@ import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
+import 'package:pharos_ai_runtime/network/http_transport_response.dart';
 import 'package:test/test.dart';
 
 class _FakeHttpTransport extends HttpTransport {
@@ -15,7 +16,7 @@ class _FakeHttpTransport extends HttpTransport {
   String responseBody = '{"choices": [{"message": {"content": "Paris."}}]}';
 
   @override
-  Future<String> post({
+  Future<HttpTransportResponse> post({
     required Uri uri,
     required Map<String, String> headers,
     required String body,
@@ -24,7 +25,11 @@ class _FakeHttpTransport extends HttpTransport {
     capturedHeaders = headers;
     capturedBody = body;
 
-    return responseBody;
+    return HttpTransportResponse(
+      statusCode: 200,
+      headers: const {},
+      body: responseBody,
+    );
   }
 }
 

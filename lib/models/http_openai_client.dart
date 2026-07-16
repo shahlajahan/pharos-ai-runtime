@@ -37,13 +37,13 @@ class HttpOpenAIClient extends OpenAIClient {
       ],
     });
 
-    final responseBody = await _transport.post(
+    final response = await _transport.post(
       uri: uri,
       headers: headers,
       body: body,
     );
 
-    final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
 
     if (decoded.containsKey('error')) {
       final error = decoded['error'] as Map<String, dynamic>;

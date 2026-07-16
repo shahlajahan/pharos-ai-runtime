@@ -89,6 +89,6 @@ void main() {
       body: '{}',
     );
 
-    expect(result, 'fake response body');
+    expect(result.body, 'fake response body');
   });
 }
