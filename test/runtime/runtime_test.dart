@@ -21,6 +21,7 @@ import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
+import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
@@ -73,13 +74,17 @@ class _ThrowingAgentRegistry extends AgentRegistry {
 class _SpyModelProvider extends MockModelProvider {
   int callCount = 0;
   ModelRequest? capturedRequest;
+  ModelResponse? returnedResponse;
 
   @override
   Future<ModelResponse> generate(ModelRequest request) async {
     callCount++;
     capturedRequest = request;
 
-    return super.generate(request);
+    final response = await super.generate(request);
+    returnedResponse = response;
+
+    return response;
   }
 }
 
@@ -94,6 +99,47 @@ class _SpyRuntimeRequestBuilder extends RuntimeRequestBuilder {
 
     return const ModelRequest(systemPrompt: '', userPrompt: '');
   }
+}
+
+class _SpyEmployeeResponseHandler extends EmployeeResponseHandler {
+  Result result = Result.success('handled');
+  int callCount = 0;
+  EmployeeRuntime? capturedEmployee;
+  ModelResponse? capturedResponse;
+
+  @override
+  Future<Result> handle(
+    EmployeeRuntime employee,
+    ModelResponse response,
+  ) async {
+    callCount++;
+    capturedEmployee = employee;
+    capturedResponse = response;
+
+    return result;
+  }
+}
+
+class _TrackingAgent extends Agent {
+  bool executed = false;
+
+  @override
+  String get id => 'marketing';
+
+  @override
+  Future<Result> run(ExecutionContext context) async {
+    executed = true;
+    return Result.success('agent ran');
+  }
+}
+
+class _TrackingAgentRegistry extends AgentRegistry {
+  _TrackingAgentRegistry(this.agent);
+
+  final _TrackingAgent agent;
+
+  @override
+  Agent? find(String id) => agent;
 }
 
 void main() {
@@ -252,4 +298,129 @@ void main() {
       expect(requestBuilder.callCount, 0);
     },
   );
+
+  test(
+    'Runtime calls modelProvider.generate() exactly once on the HQ path',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      final modelProvider = _SpyModelProvider();
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+      );
+
+      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+      expect(modelProvider.callCount, 1);
+    },
+  );
+
+  test('Runtime calls EmployeeResponseHandler.handle() exactly once on the HQ '
+      'path, forwarding the selected EmployeeRuntime and generated '
+      'ModelResponse unchanged', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _SpyModelProvider();
+    final responseHandler = _SpyEmployeeResponseHandler();
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: responseHandler,
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    expect(responseHandler.callCount, 1);
+    expect(responseHandler.capturedEmployee, same(employee));
+    expect(
+      responseHandler.capturedResponse,
+      same(modelProvider.returnedResponse),
+    );
+  });
+
+  test(
+    'Runtime returns exactly the Result returned by EmployeeResponseHandler',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      final responseHandler = _SpyEmployeeResponseHandler()
+        ..result = Result.failure('handler failure');
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: responseHandler,
+        bootstrap: _StubHQBootstrap([employee]),
+      );
+
+      final result = await runtime.run([
+        'marketing',
+      ], source: _PlaceholderHQSource());
+
+      expect(result, same(responseHandler.result));
+    },
+  );
+
+  test('Runtime does not execute the Agent pipeline on the HQ '
+      'response-handler path', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final agent = _TrackingAgent();
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      registry: _TrackingAgentRegistry(agent),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    expect(agent.executed, isFalse);
+  });
+
+  test('Runtime does not invoke EmployeeResponseHandler on the legacy no-HQ '
+      'path', () async {
+    final responseHandler = _SpyEmployeeResponseHandler();
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: responseHandler,
+    );
+
+    await runtime.run(['marketing']);
+
+    expect(responseHandler.callCount, 0);
+  });
 }

@@ -44,33 +44,36 @@ void main() {
     }
   });
 
-  test('Runtime executes the Agent when --hq points to a valid HQ', () async {
-    final employeeDir = Directory('${tempDir.path}/employees/marketing');
-    employeeDir.createSync(recursive: true);
-    File('${employeeDir.path}/employee.md').writeAsStringSync('''
+  test(
+    'Runtime returns a successful Result when --hq points to a valid HQ',
+    () async {
+      final employeeDir = Directory('${tempDir.path}/employees/marketing');
+      employeeDir.createSync(recursive: true);
+      File('${employeeDir.path}/employee.md').writeAsStringSync('''
 id: marketing
 name: Marketing Employee
 role: Marketing
 ''');
-    Directory('${employeeDir.path}/knowledge').createSync();
-    Directory('${employeeDir.path}/prompts').createSync();
-    Directory('${tempDir.path}/knowledge').createSync();
-    Directory('${tempDir.path}/prompts').createSync();
+      Directory('${employeeDir.path}/knowledge').createSync();
+      Directory('${employeeDir.path}/prompts').createSync();
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
 
-    final runtime = Runtime(
-      modelProvider: MockModelProvider(),
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _realBootstrap(),
-    );
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _realBootstrap(),
+      );
 
-    final result = await runtime.run([
-      'marketing',
-    ], source: LocalHQSource(tempDir.path));
+      final result = await runtime.run([
+        'marketing',
+      ], source: LocalHQSource(tempDir.path));
 
-    expect(result, isNotNull);
-    expect(result!.success, isTrue);
-  });
+      expect(result, isNotNull);
+      expect(result!.success, isTrue);
+    },
+  );
 
   test('Runtime returns Result.failure without executing the Agent '
       'when --hq points to an invalid HQ', () async {

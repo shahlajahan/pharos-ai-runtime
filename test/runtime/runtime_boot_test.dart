@@ -100,7 +100,8 @@ class _SpyAgentRegistry extends AgentRegistry {
 }
 
 void main() {
-  test('Runtime executes the Agent when bootstrap succeeds', () async {
+  test('Runtime returns the response-handler Result without executing the '
+      'Agent when bootstrap succeeds', () async {
     final agent = _SpyAgent();
     final runtime = Runtime(
       modelProvider: MockModelProvider(),
@@ -112,7 +113,7 @@ void main() {
 
     final result = await runtime.run(['spy'], source: _PlaceholderHQSource());
 
-    expect(agent.executed, isTrue);
+    expect(agent.executed, isFalse);
     expect(result, isNotNull);
     expect(result!.success, isTrue);
   });

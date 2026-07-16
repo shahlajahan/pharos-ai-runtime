@@ -29,7 +29,6 @@ class Runtime {
 
   final ModelProvider modelProvider;
   final RuntimeRequestBuilder _requestBuilder;
-  // ignore: unused_field
   final EmployeeResponseHandler _responseHandler;
   final AgentRegistry _registry;
   final Logger _logger;
@@ -49,8 +48,6 @@ class Runtime {
       _logger.warning('Unknown agent.');
       return null;
     }
-
-    ModelRequest request;
 
     if (_bootstrap != null && source != null) {
       final bootResult = await _bootstrap.boot(source);
@@ -72,11 +69,13 @@ class Runtime {
         return Result.failure('Employee "${args.first}" not found.');
       }
 
-      request = _requestBuilder.build(selectedEmployee);
-    } else {
-      request = _buildModelRequest();
+      final request = _requestBuilder.build(selectedEmployee);
+      final response = await modelProvider.generate(request);
+
+      return _responseHandler.handle(selectedEmployee, response);
     }
 
+    final request = _buildModelRequest();
     // ignore: unused_local_variable
     final response = await modelProvider.generate(request);
 
