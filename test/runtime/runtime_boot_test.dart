@@ -1,6 +1,7 @@
 import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/employees/employee_definition.dart';
 import 'package:pharos_ai_runtime/employees/employee_repository.dart';
 import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
@@ -16,6 +17,7 @@ import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
+import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
 
@@ -44,8 +46,20 @@ class _SucceedingBootstrap extends HQBootstrap {
       );
 
   @override
-  Future<HQBootResult> boot(HQSource source) async =>
-      HQBootResult(result: Result.success('booted'), employees: const []);
+  Future<HQBootResult> boot(HQSource source) async => HQBootResult(
+    result: Result.success('booted'),
+    employees: const [
+      EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'spy',
+          name: 'Spy Employee',
+          role: 'Spy',
+        ),
+        knowledge: [],
+        prompts: [],
+      ),
+    ],
+  );
 }
 
 class _FailingBootstrap extends HQBootstrap {

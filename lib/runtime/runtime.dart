@@ -7,6 +7,7 @@ import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 
 class Runtime {
   Runtime({
@@ -45,6 +46,19 @@ class Runtime {
 
       if (!bootResult.result.success) {
         return bootResult.result;
+      }
+
+      EmployeeRuntime? selectedEmployee;
+
+      for (final employee in bootResult.employees) {
+        if (employee.definition.id == args.first) {
+          selectedEmployee = employee;
+          break;
+        }
+      }
+
+      if (selectedEmployee == null) {
+        return Result.failure('Employee "${args.first}" not found.');
       }
     }
 

@@ -45,7 +45,15 @@ void main() {
   test(
     'Runtime executes the Agent when --hq points to a valid HQ',
     () async {
-      Directory('${tempDir.path}/employees').createSync();
+      final employeeDir = Directory('${tempDir.path}/employees/marketing');
+      employeeDir.createSync(recursive: true);
+      File('${employeeDir.path}/employee.md').writeAsStringSync('''
+id: marketing
+name: Marketing Employee
+role: Marketing
+''');
+      Directory('${employeeDir.path}/knowledge').createSync();
+      Directory('${employeeDir.path}/prompts').createSync();
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 

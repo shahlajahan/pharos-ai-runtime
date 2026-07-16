@@ -1,12 +1,56 @@
 import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/employees/employee_definition.dart';
+import 'package:pharos_ai_runtime/employees/employee_repository.dart';
+import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
+import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
+import 'package:pharos_ai_runtime/hq/employee_loader.dart';
+import 'package:pharos_ai_runtime/hq/hq_boot_result.dart';
+import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
+import 'package:pharos_ai_runtime/hq/hq_source.dart';
+import 'package:pharos_ai_runtime/hq/hq_validator.dart';
+import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
+import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
+import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
+import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
+import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
+import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
+
+class _PlaceholderHQSource extends HQSource {
+  @override
+  Future<String> rootPath() async => '/placeholder/hq';
+}
+
+class _StubHQBootstrap extends HQBootstrap {
+  _StubHQBootstrap(this._employees)
+    : super(
+        validator: HQValidator(),
+        repository: EmployeeRepository(
+          discovery: EmployeeDiscovery(),
+          loader: EmployeeLoader(),
+          parser: MarkdownEmployeeParser(),
+        ),
+        employeeFactory: EmployeeFactory(
+          knowledgeRepository: KnowledgeRepository(
+            parser: MarkdownKnowledgeParser(),
+          ),
+          promptRepository: PromptRepository(parser: MarkdownPromptParser()),
+        ),
+      );
+
+  final List<EmployeeRuntime> _employees;
+
+  @override
+  Future<HQBootResult> boot(HQSource source) async =>
+      HQBootResult(result: Result.success('booted'), employees: _employees);
+}
 
 class _ThrowingAgent extends Agent {
   @override
@@ -88,6 +132,53 @@ void main() {
       await runtime.run(['marketing']);
 
       expect(modelProvider.capturedRequest, isA<ModelRequest>());
+    },
+  );
+
+  test(
+    'Runtime selects the matching EmployeeRuntime after a successful boot',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        bootstrap: _StubHQBootstrap([employee]),
+      );
+
+      final result = await runtime.run(
+        ['marketing'],
+        source: _PlaceholderHQSource(),
+      );
+
+      expect(result, isNotNull);
+      expect(result!.success, isTrue);
+    },
+  );
+
+  test(
+    'Runtime returns Result.failure when no employee matches the requested '
+    'id',
+    () async {
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        bootstrap: _StubHQBootstrap(const []),
+      );
+
+      final result = await runtime.run(
+        ['marketing'],
+        source: _PlaceholderHQSource(),
+      );
+
+      expect(result, isNotNull);
+      expect(result!.success, isFalse);
+      expect(result.message, contains('marketing'));
     },
   );
 }
