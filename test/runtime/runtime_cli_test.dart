@@ -10,6 +10,9 @@ import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_provider_resolver.dart';
+import 'package:pharos_ai_runtime/models/openai_environment.dart';
+import 'package:pharos_ai_runtime/models/openai_provider.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
@@ -17,6 +20,13 @@ import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
+
+const _openAiEnvironment = OpenAIEnvironment(
+  apiKey: 'sk-test-key',
+  baseUrl: 'https://api.openai.com/v1/chat/completions',
+  model: 'gpt-4',
+  temperature: 0.7,
+);
 
 HQBootstrap _realBootstrap() => HQBootstrap(
   validator: HQValidator(),
@@ -103,5 +113,36 @@ role: Marketing
 
     expect(result, isNotNull);
     expect(result!.success, isTrue);
+  });
+
+  test('Default production wiring (useOpenAI: false) resolves to '
+      'MockModelProvider and Runtime starts normally', () async {
+    final provider = ModelProviderResolver.resolve(
+      useOpenAI: false,
+      environment: _openAiEnvironment,
+    );
+
+    expect(provider, isA<MockModelProvider>());
+
+    final runtime = Runtime(
+      modelProvider: provider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    final result = await runtime.run(['marketing']);
+
+    expect(result, isNotNull);
+    expect(result!.success, isTrue);
+  });
+
+  test('Production wiring with OPENAI_ENABLED=true constructs an '
+      'OpenAIProvider successfully without performing any HTTP request', () {
+    final provider = ModelProviderResolver.resolve(
+      useOpenAI: true,
+      environment: _openAiEnvironment,
+    );
+
+    expect(provider, isA<OpenAIProvider>());
   });
 }
