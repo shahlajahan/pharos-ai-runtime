@@ -5,10 +5,18 @@ import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 class DefaultRuntimeRequestBuilder extends RuntimeRequestBuilder {
   @override
   ModelRequest build(EmployeeRuntime employee) {
-    final systemPrompt =
+    final header =
         'You are ${employee.definition.name}.\n'
         'Your role is ${employee.definition.role}.';
 
-    return ModelRequest(systemPrompt: systemPrompt, userPrompt: '');
+    if (employee.prompts.isEmpty) {
+      return ModelRequest(systemPrompt: header, userPrompt: '');
+    }
+
+    final prompts = employee.prompts
+        .map((prompt) => prompt.content)
+        .join('\n\n');
+
+    return ModelRequest(systemPrompt: '$header\n\n$prompts', userPrompt: '');
   }
 }
