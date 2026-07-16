@@ -9,6 +9,7 @@ import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
+import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
@@ -48,7 +49,10 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final runtime = Runtime(bootstrap: _realBootstrap());
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        bootstrap: _realBootstrap(),
+      );
 
       final result = await runtime.run(
         ['marketing'],
@@ -64,7 +68,10 @@ void main() {
     'Runtime returns Result.failure without executing the Agent '
     'when --hq points to an invalid HQ',
     () async {
-      final runtime = Runtime(bootstrap: _realBootstrap());
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        bootstrap: _realBootstrap(),
+      );
 
       final result = await runtime.run(
         ['marketing'],
@@ -77,7 +84,7 @@ void main() {
   );
 
   test('Runtime behaves normally when --hq is not provided', () async {
-    final runtime = Runtime();
+    final runtime = Runtime(modelProvider: MockModelProvider());
 
     final result = await runtime.run(['marketing']);
 

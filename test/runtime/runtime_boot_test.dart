@@ -10,6 +10,7 @@ import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
+import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
@@ -83,6 +84,7 @@ void main() {
   test('Runtime executes the Agent when bootstrap succeeds', () async {
     final agent = _SpyAgent();
     final runtime = Runtime(
+      modelProvider: MockModelProvider(),
       registry: _SpyAgentRegistry(agent),
       bootstrap: _SucceedingBootstrap(),
     );
@@ -100,6 +102,7 @@ void main() {
   test('Runtime does not execute the Agent when bootstrap fails', () async {
     final agent = _SpyAgent();
     final runtime = Runtime(
+      modelProvider: MockModelProvider(),
       registry: _SpyAgentRegistry(agent),
       bootstrap: _FailingBootstrap(),
     );
@@ -119,7 +122,10 @@ void main() {
     'Runtime behaves exactly as before when no bootstrap is provided',
     () async {
       final agent = _SpyAgent();
-      final runtime = Runtime(registry: _SpyAgentRegistry(agent));
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        registry: _SpyAgentRegistry(agent),
+      );
 
       final result = await runtime.run(['spy']);
 

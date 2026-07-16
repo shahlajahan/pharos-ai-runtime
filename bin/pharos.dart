@@ -8,6 +8,7 @@ import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
+import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
@@ -41,7 +42,10 @@ void main(List<String> arguments) async {
     }
   }
 
-  final runtime = Runtime(bootstrap: bootstrap);
+  final runtime = Runtime(
+    modelProvider: MockModelProvider(),
+    bootstrap: bootstrap,
+  );
 
   await runtime.run(agentArgs, source: source);
 }

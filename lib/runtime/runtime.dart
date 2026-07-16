@@ -5,9 +5,11 @@ import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
+import 'package:pharos_ai_runtime/models/model_provider.dart';
 
 class Runtime {
   Runtime({
+    required this.modelProvider,
     Config config = const Config(),
     AgentRegistry? registry,
     Logger logger = const Logger(),
@@ -17,6 +19,7 @@ class Runtime {
        _pipeline = ExecutionPipeline(config: config, logger: logger),
        _bootstrap = bootstrap;
 
+  final ModelProvider modelProvider;
   final AgentRegistry _registry;
   final Logger _logger;
   final ExecutionPipeline _pipeline;
