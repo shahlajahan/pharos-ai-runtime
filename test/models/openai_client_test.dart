@@ -1,7 +1,7 @@
 import 'package:pharos_ai_runtime/models/model_request.dart';
-import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/models/openai_client.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
+import 'package:pharos_ai_runtime/models/openai_result.dart';
 import 'package:test/test.dart';
 
 class _FakeOpenAIClient extends OpenAIClient {
@@ -9,19 +9,19 @@ class _FakeOpenAIClient extends OpenAIClient {
   OpenAIConfig? capturedConfig;
 
   @override
-  Future<ModelResponse> complete(
+  Future<OpenAIResult> complete(
     ModelRequest request,
     OpenAIConfig config,
   ) async {
     capturedRequest = request;
     capturedConfig = config;
 
-    return const ModelResponse(text: 'Fake response');
+    return const OpenAIResult(text: 'Fake response');
   }
 }
 
 void main() {
-  test('complete() returns a ModelResponse', () async {
+  test('complete() returns an OpenAIResult', () async {
     final client = _FakeOpenAIClient();
     const request = ModelRequest(
       systemPrompt: 'You are a helpful assistant.',
@@ -32,9 +32,9 @@ void main() {
       baseUrl: 'https://api.openai.com/v1',
     );
 
-    final response = await client.complete(request, config);
+    final result = await client.complete(request, config);
 
-    expect(response.text, 'Fake response');
+    expect(result.text, 'Fake response');
   });
 
   test('complete() passes the request through unchanged', () async {
