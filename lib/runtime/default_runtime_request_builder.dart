@@ -9,14 +9,20 @@ class DefaultRuntimeRequestBuilder extends RuntimeRequestBuilder {
         'You are ${employee.definition.name}.\n'
         'Your role is ${employee.definition.role}.';
 
-    if (employee.prompts.isEmpty) {
-      return ModelRequest(systemPrompt: header, userPrompt: '');
+    final sections = <String>[header];
+
+    if (employee.prompts.isNotEmpty) {
+      sections.add(
+        employee.prompts.map((prompt) => prompt.content).join('\n\n'),
+      );
     }
 
-    final prompts = employee.prompts
-        .map((prompt) => prompt.content)
-        .join('\n\n');
+    if (employee.knowledge.isNotEmpty) {
+      sections.add(
+        employee.knowledge.map((knowledge) => knowledge.content).join('\n\n'),
+      );
+    }
 
-    return ModelRequest(systemPrompt: '$header\n\n$prompts', userPrompt: '');
+    return ModelRequest(systemPrompt: sections.join('\n\n'), userPrompt: '');
   }
 }
