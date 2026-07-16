@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/employees/employee_repository.dart';
 import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
 import 'package:pharos_ai_runtime/hq/employee_loader.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
+import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
@@ -19,6 +21,7 @@ import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
+import 'package:pharos_ai_runtime/runtime/runtime_runner.dart';
 import 'package:test/test.dart';
 
 const _openAiEnvironment = OpenAIEnvironment(
@@ -27,6 +30,27 @@ const _openAiEnvironment = OpenAIEnvironment(
   model: 'gpt-4',
   temperature: 0.7,
 );
+
+class _FakeRuntime extends Runtime {
+  _FakeRuntime()
+    : super(
+        modelProvider: MockModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+      );
+
+  List<String>? capturedArgs;
+  HQSource? capturedSource;
+  Result? result = Result.success('fake result');
+
+  @override
+  Future<Result?> run(List<String> args, {HQSource? source}) async {
+    capturedArgs = args;
+    capturedSource = source;
+
+    return result;
+  }
+}
 
 HQBootstrap _realBootstrap() => HQBootstrap(
   validator: HQValidator(),
@@ -144,5 +168,34 @@ role: Marketing
     );
 
     expect(provider, isA<OpenAIProvider>());
+  });
+
+  test('RuntimeRunner forwards args unchanged', () async {
+    final fakeRuntime = _FakeRuntime();
+    final runner = RuntimeRunner(runtime: fakeRuntime);
+    final args = ['marketing'];
+
+    await runner.run(args: args);
+
+    expect(fakeRuntime.capturedArgs, same(args));
+  });
+
+  test('RuntimeRunner forwards source unchanged', () async {
+    final fakeRuntime = _FakeRuntime();
+    final runner = RuntimeRunner(runtime: fakeRuntime);
+    final source = LocalHQSource(tempDir.path);
+
+    await runner.run(args: const ['marketing'], source: source);
+
+    expect(fakeRuntime.capturedSource, same(source));
+  });
+
+  test('RuntimeRunner returns exactly Runtime.run()\'s Result', () async {
+    final fakeRuntime = _FakeRuntime();
+    final runner = RuntimeRunner(runtime: fakeRuntime);
+
+    final result = await runner.run(args: const ['marketing']);
+
+    expect(result, same(fakeRuntime.result));
   });
 }

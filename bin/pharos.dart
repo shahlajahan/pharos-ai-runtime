@@ -19,6 +19,7 @@ import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
+import 'package:pharos_ai_runtime/runtime/runtime_runner.dart';
 
 void main(List<String> arguments) async {
   final agentArgs = <String>[];
@@ -64,5 +65,7 @@ void main(List<String> arguments) async {
     bootstrap: bootstrap,
   );
 
-  await runtime.run(agentArgs, source: source);
+  final runner = RuntimeRunner(runtime: runtime);
+
+  await runner.run(args: agentArgs, source: source);
 }
