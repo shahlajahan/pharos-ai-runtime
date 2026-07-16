@@ -43,6 +43,23 @@ class HttpOpenAIClient extends OpenAIClient {
       body: body,
     );
 
+    if (response.statusCode != 200) {
+      String? errorMessage;
+
+      try {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final error = decoded['error'];
+
+        if (error is Map<String, dynamic> && error['message'] is String) {
+          errorMessage = error['message'] as String;
+        }
+      } on FormatException {
+        errorMessage = null;
+      }
+
+      throw OpenAIException(errorMessage ?? 'HTTP ${response.statusCode}');
+    }
+
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
 
     if (decoded.containsKey('error')) {

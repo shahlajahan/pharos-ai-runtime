@@ -14,6 +14,7 @@ class _FakeHttpTransport extends HttpTransport {
   Map<String, String>? capturedHeaders;
   String? capturedBody;
   String responseBody = '{"choices": [{"message": {"content": "Paris."}}]}';
+  int statusCode = 200;
 
   @override
   Future<HttpTransportResponse> post({
@@ -26,7 +27,7 @@ class _FakeHttpTransport extends HttpTransport {
     capturedBody = body;
 
     return HttpTransportResponse(
-      statusCode: 200,
+      statusCode: statusCode,
       headers: const {},
       body: responseBody,
     );
@@ -296,5 +297,168 @@ void main() {
     final result = await client.complete(request, modelConfig, openAiConfig);
 
     expect(result.text, 'Paris.');
+  });
+
+  test(
+    'complete() still parses successfully for a real HTTP 200 status',
+    () async {
+      final transport = _FakeHttpTransport()..statusCode = 200;
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+      );
+
+      final result = await client.complete(request, modelConfig, openAiConfig);
+
+      expect(result.text, 'Paris.');
+    },
+  );
+
+  test('complete() throws OpenAIException with the server message for an '
+      'HTTP 400 status', () async {
+    final transport = _FakeHttpTransport()
+      ..statusCode = 400
+      ..responseBody =
+          '{"error": {"message": "Invalid request payload.", '
+          '"type": "invalid_request_error", "code": null}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<OpenAIException>().having(
+          (e) => e.message,
+          'message',
+          'Invalid request payload.',
+        ),
+      ),
+    );
+  });
+
+  test('complete() throws OpenAIException with the server message for an '
+      'HTTP 401 status', () async {
+    final transport = _FakeHttpTransport()
+      ..statusCode = 401
+      ..responseBody =
+          '{"error": {"message": "Incorrect API key provided.", '
+          '"type": "invalid_request_error", "code": "invalid_api_key"}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<OpenAIException>().having(
+          (e) => e.message,
+          'message',
+          'Incorrect API key provided.',
+        ),
+      ),
+    );
+  });
+
+  test('complete() throws OpenAIException with the server message for an '
+      'HTTP 404 status', () async {
+    final transport = _FakeHttpTransport()
+      ..statusCode = 404
+      ..responseBody =
+          '{"error": {"message": "Unknown request URL.", '
+          '"type": "invalid_request_error", "code": null}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<OpenAIException>().having(
+          (e) => e.message,
+          'message',
+          'Unknown request URL.',
+        ),
+      ),
+    );
+  });
+
+  test('complete() throws OpenAIException with the server message for an '
+      'HTTP 429 status', () async {
+    final transport = _FakeHttpTransport()
+      ..statusCode = 429
+      ..responseBody =
+          '{"error": {"message": "You exceeded your current quota, '
+          'please check your plan and billing details.", '
+          '"type": "insufficient_quota", "code": "insufficient_quota"}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<OpenAIException>().having(
+          (e) => e.message,
+          'message',
+          'You exceeded your current quota, '
+              'please check your plan and billing details.',
+        ),
+      ),
+    );
+  });
+
+  test('complete() throws OpenAIException with the server message for an '
+      'HTTP 500 status', () async {
+    final transport = _FakeHttpTransport()
+      ..statusCode = 500
+      ..responseBody =
+          '{"error": {"message": "The server had an error while '
+          'processing your request.", "type": "server_error", '
+          '"code": null}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<OpenAIException>().having(
+          (e) => e.message,
+          'message',
+          'The server had an error while processing your request.',
+        ),
+      ),
+    );
+  });
+
+  test('complete() throws OpenAIException(\'HTTP 503\') for an HTTP 503 '
+      'status without an error object', () async {
+    final transport = _FakeHttpTransport()
+      ..statusCode = 503
+      ..responseBody = 'Service Unavailable';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<OpenAIException>().having((e) => e.message, 'message', 'HTTP 503'),
+      ),
+    );
   });
 }
