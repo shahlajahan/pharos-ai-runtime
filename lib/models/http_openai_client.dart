@@ -8,8 +8,7 @@ import 'package:pharos_ai_runtime/models/openai_result.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
 
 class HttpOpenAIClient extends OpenAIClient {
-  HttpOpenAIClient({required HttpTransport transport})
-    : _transport = transport;
+  HttpOpenAIClient({required HttpTransport transport}) : _transport = transport;
 
   final HttpTransport _transport;
 
@@ -44,10 +43,15 @@ class HttpOpenAIClient extends OpenAIClient {
     );
 
     final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+
+    if (decoded.containsKey('error')) {
+      final error = decoded['error'] as Map<String, dynamic>;
+      throw StateError('OpenAI API error: ${error['message']}');
+    }
+
     final choices = decoded['choices'] as List<dynamic>;
     final message =
-        (choices[0] as Map<String, dynamic>)['message']
-            as Map<String, dynamic>;
+        (choices[0] as Map<String, dynamic>)['message'] as Map<String, dynamic>;
     final text = message['content'] as String;
 
     return OpenAIResult(text: text);

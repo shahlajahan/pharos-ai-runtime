@@ -11,8 +11,7 @@ class _FakeHttpTransport extends HttpTransport {
   Uri? capturedUri;
   Map<String, String>? capturedHeaders;
   String? capturedBody;
-  String responseBody =
-      '{"choices": [{"message": {"content": "Paris."}}]}';
+  String responseBody = '{"choices": [{"message": {"content": "Paris."}}]}';
 
   @override
   Future<String> post({
@@ -61,10 +60,7 @@ void main() {
 
       await client.complete(request, modelConfig, openAiConfig);
 
-      expect(
-        transport.capturedHeaders!['OpenAI-Organization'],
-        'org-test',
-      );
+      expect(transport.capturedHeaders!['OpenAI-Organization'], 'org-test');
     },
   );
 
@@ -170,6 +166,120 @@ void main() {
   );
 
   test('complete() returns the correct OpenAIResult.text', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final result = await client.complete(request, modelConfig, openAiConfig);
+
+    expect(result.text, 'Paris.');
+  });
+
+  test('complete() throws StateError for a 401 error response', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"error": {"message": "Incorrect API key provided.", '
+          '"type": "invalid_request_error", "code": "invalid_api_key"}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('OpenAI API error: Incorrect API key provided.'),
+        ),
+      ),
+    );
+  });
+
+  test('complete() throws StateError for a 404 error response', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"error": {"message": "Unknown request URL.", '
+          '"type": "invalid_request_error", "code": null}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('OpenAI API error: Unknown request URL.'),
+        ),
+      ),
+    );
+  });
+
+  test('complete() throws StateError for a 429 error response', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"error": {"message": "You exceeded your current quota, '
+          'please check your plan and billing details.", '
+          '"type": "insufficient_quota", "code": "insufficient_quota"}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains(
+            'OpenAI API error: You exceeded your current quota, '
+            'please check your plan and billing details.',
+          ),
+        ),
+      ),
+    );
+  });
+
+  test('complete() throws StateError for a 500 error response', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"error": {"message": "The server had an error while '
+          'processing your request.", "type": "server_error", '
+          '"code": null}}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    expect(
+      () => client.complete(request, modelConfig, openAiConfig),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains(
+            'OpenAI API error: The server had an error while '
+            'processing your request.',
+          ),
+        ),
+      ),
+    );
+  });
+
+  test('complete() still parses a successful response normally alongside '
+      'error handling', () async {
     final transport = _FakeHttpTransport();
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
