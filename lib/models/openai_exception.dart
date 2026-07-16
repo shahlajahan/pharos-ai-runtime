@@ -1,8 +1,5 @@
-class OpenAIException implements Exception {
-  const OpenAIException(this.message);
+import 'package:pharos_ai_runtime/models/model_exception.dart';
 
-  final String message;
-
-  @override
-  String toString() => message;
+class OpenAIException extends ModelException {
+  const OpenAIException(super.message);
 }
