@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 void main() {
   test(
-    'build() returns a ModelRequest with empty systemPrompt and userPrompt',
+    'build() returns a systemPrompt containing the employee name and role',
     () {
       final builder = DefaultRuntimeRequestBuilder();
       const employee = EmployeeRuntime(
@@ -20,14 +20,31 @@ void main() {
 
       final request = builder.build(employee);
 
-      expect(request.systemPrompt, '');
-      expect(request.userPrompt, '');
+      expect(request.systemPrompt, contains('Marketing Employee'));
+      expect(request.systemPrompt, contains('Marketing'));
     },
   );
 
-  test('build() accepts any EmployeeRuntime', () {
+  test('build() returns an empty userPrompt', () {
     final builder = DefaultRuntimeRequestBuilder();
     const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+
+    final request = builder.build(employee);
+
+    expect(request.userPrompt, '');
+  });
+
+  test('build() works for different employees', () {
+    final builder = DefaultRuntimeRequestBuilder();
+    const engineering = EmployeeRuntime(
       definition: EmployeeDefinition(
         id: 'engineering',
         name: 'Engineering Employee',
@@ -37,9 +54,10 @@ void main() {
       prompts: [],
     );
 
-    final request = builder.build(employee);
+    final request = builder.build(engineering);
 
-    expect(request.systemPrompt, '');
+    expect(request.systemPrompt, contains('Engineering Employee'));
+    expect(request.systemPrompt, contains('Engineering'));
     expect(request.userPrompt, '');
   });
 }
