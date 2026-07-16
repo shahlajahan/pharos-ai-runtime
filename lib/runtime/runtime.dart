@@ -7,6 +7,7 @@ import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
@@ -70,9 +71,14 @@ class Runtime {
       }
 
       final request = _requestBuilder.build(selectedEmployee);
-      final response = await modelProvider.generate(request);
 
-      return _responseHandler.handle(selectedEmployee, response);
+      try {
+        final response = await modelProvider.generate(request);
+
+        return await _responseHandler.handle(selectedEmployee, response);
+      } on OpenAIException catch (e) {
+        return Result.failure(e.message);
+      }
     }
 
     final request = _buildModelRequest();

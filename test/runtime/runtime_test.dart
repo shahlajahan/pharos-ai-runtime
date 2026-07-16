@@ -13,8 +13,10 @@ import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
+import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
@@ -140,6 +142,27 @@ class _TrackingAgentRegistry extends AgentRegistry {
 
   @override
   Agent? find(String id) => agent;
+}
+
+class _OpenAIExceptionModelProvider extends ModelProvider {
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async {
+    throw const OpenAIException('rate limit exceeded');
+  }
+}
+
+class _StateErrorModelProvider extends ModelProvider {
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async {
+    throw StateError('boom');
+  }
+}
+
+class _FormatExceptionModelProvider extends ModelProvider {
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async {
+    throw const FormatException('bad format');
+  }
 }
 
 void main() {
@@ -423,4 +446,106 @@ void main() {
 
     expect(responseHandler.callCount, 0);
   });
+
+  test('Runtime still returns the handler Result when the ModelProvider '
+      'succeeds on the HQ path', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    final result = await runtime.run([
+      'marketing',
+    ], source: _PlaceholderHQSource());
+
+    expect(result, isNotNull);
+    expect(result!.success, isTrue);
+  });
+
+  test('Runtime converts OpenAIException into Result.failure(message) on '
+      'the HQ path', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final runtime = Runtime(
+      modelProvider: _OpenAIExceptionModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    final result = await runtime.run([
+      'marketing',
+    ], source: _PlaceholderHQSource());
+
+    expect(result, isNotNull);
+    expect(result!.success, isFalse);
+    expect(result.message, 'rate limit exceeded');
+  });
+
+  test('Runtime lets StateError propagate uncaught on the HQ path', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final runtime = Runtime(
+      modelProvider: _StateErrorModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    expect(
+      () => runtime.run(['marketing'], source: _PlaceholderHQSource()),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  test(
+    'Runtime lets FormatException propagate uncaught on the HQ path',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      final runtime = Runtime(
+        modelProvider: _FormatExceptionModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+      );
+
+      expect(
+        () => runtime.run(['marketing'], source: _PlaceholderHQSource()),
+        throwsA(isA<FormatException>()),
+      );
+    },
+  );
 }
