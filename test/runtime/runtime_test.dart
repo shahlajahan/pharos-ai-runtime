@@ -18,6 +18,7 @@ import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
+import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
@@ -102,6 +103,7 @@ void main() {
     final runtime = Runtime(
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
     );
 
     expect(runtime.modelProvider, same(modelProvider));
@@ -111,6 +113,7 @@ void main() {
     final runtime = Runtime(
       modelProvider: MockModelProvider(),
       requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
     );
 
     final result = await runtime.run(['marketing']);
@@ -123,6 +126,7 @@ void main() {
     final runtime = Runtime(
       modelProvider: MockModelProvider(),
       requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
       registry: _ThrowingAgentRegistry(),
     );
 
@@ -138,6 +142,7 @@ void main() {
     final runtime = Runtime(
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
     );
 
     await runtime.run(['marketing']);
@@ -150,6 +155,7 @@ void main() {
     final runtime = Runtime(
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
     );
 
     await runtime.run(['marketing']);
@@ -172,6 +178,7 @@ void main() {
       final runtime = Runtime(
         modelProvider: MockModelProvider(),
         requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
         bootstrap: _StubHQBootstrap([employee]),
       );
 
@@ -189,6 +196,7 @@ void main() {
     final runtime = Runtime(
       modelProvider: MockModelProvider(),
       requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
       bootstrap: _StubHQBootstrap(const []),
     );
 
@@ -218,6 +226,7 @@ void main() {
       final runtime = Runtime(
         modelProvider: MockModelProvider(),
         requestBuilder: requestBuilder,
+        responseHandler: DefaultEmployeeResponseHandler(),
         bootstrap: _StubHQBootstrap([employee]),
       );
 
@@ -235,6 +244,7 @@ void main() {
       final runtime = Runtime(
         modelProvider: MockModelProvider(),
         requestBuilder: requestBuilder,
+        responseHandler: DefaultEmployeeResponseHandler(),
       );
 
       await runtime.run(['marketing']);

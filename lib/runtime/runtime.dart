@@ -7,6 +7,7 @@ import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 
@@ -14,11 +15,13 @@ class Runtime {
   Runtime({
     required this.modelProvider,
     required RuntimeRequestBuilder requestBuilder,
+    required EmployeeResponseHandler responseHandler,
     Config config = const Config(),
     AgentRegistry? registry,
     Logger logger = const Logger(),
     HQBootstrap? bootstrap,
   }) : _requestBuilder = requestBuilder,
+       _responseHandler = responseHandler,
        _registry = registry ?? AgentRegistry(),
        _logger = logger,
        _pipeline = ExecutionPipeline(config: config, logger: logger),
@@ -26,6 +29,8 @@ class Runtime {
 
   final ModelProvider modelProvider;
   final RuntimeRequestBuilder _requestBuilder;
+  // ignore: unused_field
+  final EmployeeResponseHandler _responseHandler;
   final AgentRegistry _registry;
   final Logger _logger;
   final ExecutionPipeline _pipeline;
