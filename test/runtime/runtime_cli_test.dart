@@ -12,6 +12,7 @@ import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
+import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:test/test.dart';
@@ -42,57 +43,54 @@ void main() {
     }
   });
 
-  test(
-    'Runtime executes the Agent when --hq points to a valid HQ',
-    () async {
-      final employeeDir = Directory('${tempDir.path}/employees/marketing');
-      employeeDir.createSync(recursive: true);
-      File('${employeeDir.path}/employee.md').writeAsStringSync('''
+  test('Runtime executes the Agent when --hq points to a valid HQ', () async {
+    final employeeDir = Directory('${tempDir.path}/employees/marketing');
+    employeeDir.createSync(recursive: true);
+    File('${employeeDir.path}/employee.md').writeAsStringSync('''
 id: marketing
 name: Marketing Employee
 role: Marketing
 ''');
-      Directory('${employeeDir.path}/knowledge').createSync();
-      Directory('${employeeDir.path}/prompts').createSync();
-      Directory('${tempDir.path}/knowledge').createSync();
-      Directory('${tempDir.path}/prompts').createSync();
+    Directory('${employeeDir.path}/knowledge').createSync();
+    Directory('${employeeDir.path}/prompts').createSync();
+    Directory('${tempDir.path}/knowledge').createSync();
+    Directory('${tempDir.path}/prompts').createSync();
 
-      final runtime = Runtime(
-        modelProvider: MockModelProvider(),
-        bootstrap: _realBootstrap(),
-      );
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      bootstrap: _realBootstrap(),
+    );
 
-      final result = await runtime.run(
-        ['marketing'],
-        source: LocalHQSource(tempDir.path),
-      );
+    final result = await runtime.run([
+      'marketing',
+    ], source: LocalHQSource(tempDir.path));
 
-      expect(result, isNotNull);
-      expect(result!.success, isTrue);
-    },
-  );
+    expect(result, isNotNull);
+    expect(result!.success, isTrue);
+  });
 
-  test(
-    'Runtime returns Result.failure without executing the Agent '
-    'when --hq points to an invalid HQ',
-    () async {
-      final runtime = Runtime(
-        modelProvider: MockModelProvider(),
-        bootstrap: _realBootstrap(),
-      );
+  test('Runtime returns Result.failure without executing the Agent '
+      'when --hq points to an invalid HQ', () async {
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      bootstrap: _realBootstrap(),
+    );
 
-      final result = await runtime.run(
-        ['marketing'],
-        source: LocalHQSource('${tempDir.path}/does-not-exist'),
-      );
+    final result = await runtime.run([
+      'marketing',
+    ], source: LocalHQSource('${tempDir.path}/does-not-exist'));
 
-      expect(result, isNotNull);
-      expect(result!.success, isFalse);
-    },
-  );
+    expect(result, isNotNull);
+    expect(result!.success, isFalse);
+  });
 
   test('Runtime behaves normally when --hq is not provided', () async {
-    final runtime = Runtime(modelProvider: MockModelProvider());
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+    );
 
     final result = await runtime.run(['marketing']);
 

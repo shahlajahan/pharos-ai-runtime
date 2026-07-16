@@ -18,9 +18,11 @@ import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
+import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
+import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 import 'package:test/test.dart';
 
 class _PlaceholderHQSource extends HQSource {
@@ -80,17 +82,36 @@ class _SpyModelProvider extends MockModelProvider {
   }
 }
 
+class _SpyRuntimeRequestBuilder extends RuntimeRequestBuilder {
+  int callCount = 0;
+  EmployeeRuntime? capturedEmployee;
+
+  @override
+  ModelRequest build(EmployeeRuntime employee) {
+    callCount++;
+    capturedEmployee = employee;
+
+    return const ModelRequest(systemPrompt: '', userPrompt: '');
+  }
+}
+
 void main() {
   test('Runtime accepts a ModelProvider', () {
     final modelProvider = MockModelProvider();
 
-    final runtime = Runtime(modelProvider: modelProvider);
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+    );
 
     expect(runtime.modelProvider, same(modelProvider));
   });
 
   test('Runtime resolves the marketing agent and returns its Result', () async {
-    final runtime = Runtime(modelProvider: MockModelProvider());
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+    );
 
     final result = await runtime.run(['marketing']);
 
@@ -98,42 +119,43 @@ void main() {
     expect(result!.success, isTrue);
   });
 
-  test(
-    'Runtime catches agent exceptions and returns Result.failure',
-    () async {
-      final runtime = Runtime(
-        modelProvider: MockModelProvider(),
-        registry: _ThrowingAgentRegistry(),
-      );
+  test('Runtime catches agent exceptions and returns Result.failure', () async {
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      registry: _ThrowingAgentRegistry(),
+    );
 
-      final result = await runtime.run(['throwing']);
+    final result = await runtime.run(['throwing']);
 
-      expect(result, isNotNull);
-      expect(result!.success, isFalse);
-      expect(result.message, contains('boom'));
-    },
-  );
+    expect(result, isNotNull);
+    expect(result!.success, isFalse);
+    expect(result.message, contains('boom'));
+  });
 
   test('Runtime calls modelProvider.generate() exactly once', () async {
     final modelProvider = _SpyModelProvider();
-    final runtime = Runtime(modelProvider: modelProvider);
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+    );
 
     await runtime.run(['marketing']);
 
     expect(modelProvider.callCount, 1);
   });
 
-  test(
-    'Runtime calls modelProvider.generate() with a ModelRequest',
-    () async {
-      final modelProvider = _SpyModelProvider();
-      final runtime = Runtime(modelProvider: modelProvider);
+  test('Runtime calls modelProvider.generate() with a ModelRequest', () async {
+    final modelProvider = _SpyModelProvider();
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+    );
 
-      await runtime.run(['marketing']);
+    await runtime.run(['marketing']);
 
-      expect(modelProvider.capturedRequest, isA<ModelRequest>());
-    },
-  );
+    expect(modelProvider.capturedRequest, isA<ModelRequest>());
+  });
 
   test(
     'Runtime selects the matching EmployeeRuntime after a successful boot',
@@ -149,36 +171,75 @@ void main() {
       );
       final runtime = Runtime(
         modelProvider: MockModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
         bootstrap: _StubHQBootstrap([employee]),
       );
 
-      final result = await runtime.run(
-        ['marketing'],
-        source: _PlaceholderHQSource(),
-      );
+      final result = await runtime.run([
+        'marketing',
+      ], source: _PlaceholderHQSource());
 
       expect(result, isNotNull);
       expect(result!.success, isTrue);
     },
   );
 
+  test('Runtime returns Result.failure when no employee matches the requested '
+      'id', () async {
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      bootstrap: _StubHQBootstrap(const []),
+    );
+
+    final result = await runtime.run([
+      'marketing',
+    ], source: _PlaceholderHQSource());
+
+    expect(result, isNotNull);
+    expect(result!.success, isFalse);
+    expect(result.message, contains('marketing'));
+  });
+
   test(
-    'Runtime returns Result.failure when no employee matches the requested '
-    'id',
+    'Runtime delegates request creation to RuntimeRequestBuilder, calling '
+    'build() exactly once with the selected EmployeeRuntime unchanged',
     () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      final requestBuilder = _SpyRuntimeRequestBuilder();
       final runtime = Runtime(
         modelProvider: MockModelProvider(),
-        bootstrap: _StubHQBootstrap(const []),
+        requestBuilder: requestBuilder,
+        bootstrap: _StubHQBootstrap([employee]),
       );
 
-      final result = await runtime.run(
-        ['marketing'],
-        source: _PlaceholderHQSource(),
+      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+      expect(requestBuilder.callCount, 1);
+      expect(requestBuilder.capturedEmployee, same(employee));
+    },
+  );
+
+  test(
+    'Runtime does not invoke RuntimeRequestBuilder on the legacy no-HQ path',
+    () async {
+      final requestBuilder = _SpyRuntimeRequestBuilder();
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: requestBuilder,
       );
 
-      expect(result, isNotNull);
-      expect(result!.success, isFalse);
-      expect(result.message, contains('marketing'));
+      await runtime.run(['marketing']);
+
+      expect(requestBuilder.callCount, 0);
     },
   );
 }

@@ -16,6 +16,7 @@ import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
+import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
@@ -71,10 +72,8 @@ class _FailingBootstrap extends HQBootstrap {
       );
 
   @override
-  Future<HQBootResult> boot(HQSource source) async => HQBootResult(
-    result: Result.failure('boot failed'),
-    employees: const [],
-  );
+  Future<HQBootResult> boot(HQSource source) async =>
+      HQBootResult(result: Result.failure('boot failed'), employees: const []);
 }
 
 class _SpyAgent extends Agent {
@@ -104,14 +103,12 @@ void main() {
     final agent = _SpyAgent();
     final runtime = Runtime(
       modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
       registry: _SpyAgentRegistry(agent),
       bootstrap: _SucceedingBootstrap(),
     );
 
-    final result = await runtime.run(
-      ['spy'],
-      source: _PlaceholderHQSource(),
-    );
+    final result = await runtime.run(['spy'], source: _PlaceholderHQSource());
 
     expect(agent.executed, isTrue);
     expect(result, isNotNull);
@@ -122,14 +119,12 @@ void main() {
     final agent = _SpyAgent();
     final runtime = Runtime(
       modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
       registry: _SpyAgentRegistry(agent),
       bootstrap: _FailingBootstrap(),
     );
 
-    final result = await runtime.run(
-      ['spy'],
-      source: _PlaceholderHQSource(),
-    );
+    final result = await runtime.run(['spy'], source: _PlaceholderHQSource());
 
     expect(agent.executed, isFalse);
     expect(result, isNotNull);
@@ -143,6 +138,7 @@ void main() {
       final agent = _SpyAgent();
       final runtime = Runtime(
         modelProvider: MockModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
         registry: _SpyAgentRegistry(agent),
       );
 

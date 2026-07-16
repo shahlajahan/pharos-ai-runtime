@@ -11,6 +11,7 @@ import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
+import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 
@@ -44,6 +45,7 @@ void main(List<String> arguments) async {
 
   final runtime = Runtime(
     modelProvider: MockModelProvider(),
+    requestBuilder: DefaultRuntimeRequestBuilder(),
     bootstrap: bootstrap,
   );
 

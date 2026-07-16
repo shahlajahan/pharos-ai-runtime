@@ -8,20 +8,24 @@ import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
+import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 
 class Runtime {
   Runtime({
     required this.modelProvider,
+    required RuntimeRequestBuilder requestBuilder,
     Config config = const Config(),
     AgentRegistry? registry,
     Logger logger = const Logger(),
     HQBootstrap? bootstrap,
-  }) : _registry = registry ?? AgentRegistry(),
+  }) : _requestBuilder = requestBuilder,
+       _registry = registry ?? AgentRegistry(),
        _logger = logger,
        _pipeline = ExecutionPipeline(config: config, logger: logger),
        _bootstrap = bootstrap;
 
   final ModelProvider modelProvider;
+  final RuntimeRequestBuilder _requestBuilder;
   final AgentRegistry _registry;
   final Logger _logger;
   final ExecutionPipeline _pipeline;
@@ -40,6 +44,8 @@ class Runtime {
       _logger.warning('Unknown agent.');
       return null;
     }
+
+    ModelRequest request;
 
     if (_bootstrap != null && source != null) {
       final bootResult = await _bootstrap.boot(source);
@@ -60,9 +66,12 @@ class Runtime {
       if (selectedEmployee == null) {
         return Result.failure('Employee "${args.first}" not found.');
       }
+
+      request = _requestBuilder.build(selectedEmployee);
+    } else {
+      request = _buildModelRequest();
     }
 
-    final request = _buildModelRequest();
     // ignore: unused_local_variable
     final response = await modelProvider.generate(request);
 
