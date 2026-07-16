@@ -112,24 +112,33 @@ void main() {
     }
   });
 
-  test('boot() returns Result.failure for an invalid HQ', () async {
-    final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+  test(
+    'boot() returns a failure Result and empty employees for an invalid HQ',
+    () async {
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-    expect(result.success, isFalse);
-  });
-
-  test('boot() succeeds for an empty but valid HQ', () async {
-    Directory('${tempDir.path}/employees').createSync();
-    Directory('${tempDir.path}/knowledge').createSync();
-    Directory('${tempDir.path}/prompts').createSync();
-
-    final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
-
-    expect(result.success, isTrue);
-  });
+      expect(bootResult.result.success, isFalse);
+      expect(bootResult.employees, isEmpty);
+    },
+  );
 
   test(
-    'boot() returns Result.failure when a discovered employee directory is missing',
+    'boot() succeeds with an empty employee list for an empty but valid HQ',
+    () async {
+      Directory('${tempDir.path}/employees').createSync();
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
+
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
+
+      expect(bootResult.result.success, isTrue);
+      expect(bootResult.employees, isEmpty);
+    },
+  );
+
+  test(
+    'boot() returns a failure Result and empty employees when a discovered '
+    'employee directory is missing',
     () async {
       Directory('${tempDir.path}/employees').createSync();
       Directory('${tempDir.path}/knowledge').createSync();
@@ -139,26 +148,32 @@ void main() {
         discovery: _EmployeeDiscoveryWithMissingEmployee(),
       );
 
-      final result = await bootstrap.boot(LocalHQSource(tempDir.path));
+      final bootResult = await bootstrap.boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isFalse);
+      expect(bootResult.result.success, isFalse);
+      expect(bootResult.employees, isEmpty);
     },
   );
 
-  test('boot() returns Result.failure for a broken employee.md', () async {
-    Directory(
-      '${tempDir.path}/employees/marketing',
-    ).createSync(recursive: true);
-    File(
-      '${tempDir.path}/employees/marketing/employee.md',
-    ).writeAsStringSync('id: marketing\nname: Marketing Employee\n');
-    Directory('${tempDir.path}/knowledge').createSync();
-    Directory('${tempDir.path}/prompts').createSync();
+  test(
+    'boot() returns a failure Result and empty employees for a broken '
+    'employee.md',
+    () async {
+      Directory(
+        '${tempDir.path}/employees/marketing',
+      ).createSync(recursive: true);
+      File(
+        '${tempDir.path}/employees/marketing/employee.md',
+      ).writeAsStringSync('id: marketing\nname: Marketing Employee\n');
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
 
-    final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-    expect(result.success, isFalse);
-  });
+      expect(bootResult.result.success, isFalse);
+      expect(bootResult.employees, isEmpty);
+    },
+  );
 
   test(
     'boot() succeeds for a single employee with empty knowledge and prompts',
@@ -175,9 +190,11 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isTrue);
+      expect(bootResult.result.success, isTrue);
+      expect(bootResult.employees, hasLength(1));
+      expect(bootResult.employees.first.definition.id, 'marketing');
     },
   );
 
@@ -202,15 +219,18 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isTrue);
+      expect(bootResult.result.success, isTrue);
+      expect(bootResult.employees, hasLength(1));
+      expect(bootResult.employees.first.knowledge, hasLength(1));
+      expect(bootResult.employees.first.prompts, hasLength(1));
     },
   );
 
   test(
     'boot() succeeds for multiple employees each with their own knowledge '
-    'and prompts',
+    'and prompts, returned in repository order',
     () async {
       for (final id in ['marketing', 'engineering']) {
         final employeeDir = Directory('${tempDir.path}/employees/$id');
@@ -221,15 +241,19 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isTrue);
+      expect(bootResult.result.success, isTrue);
+      expect(
+        bootResult.employees.map((e) => e.definition.id).toList(),
+        ['engineering', 'marketing'],
+      );
     },
   );
 
   test(
-    'boot() returns Result.failure when an employee is missing its '
-    'knowledge directory',
+    'boot() returns a failure Result and empty employees when an employee '
+    'is missing its knowledge directory',
     () async {
       final employeeDir = Directory('${tempDir.path}/employees/marketing');
       _writeEmployeeMd(
@@ -243,15 +267,16 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isFalse);
+      expect(bootResult.result.success, isFalse);
+      expect(bootResult.employees, isEmpty);
     },
   );
 
   test(
-    'boot() returns Result.failure when an employee is missing its '
-    'prompts directory',
+    'boot() returns a failure Result and empty employees when an employee '
+    'is missing its prompts directory',
     () async {
       final employeeDir = Directory('${tempDir.path}/employees/marketing');
       _writeEmployeeMd(
@@ -265,15 +290,16 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isFalse);
+      expect(bootResult.result.success, isFalse);
+      expect(bootResult.employees, isEmpty);
     },
   );
 
   test(
-    'boot() returns Result.failure when an employee knowledge document '
-    'cannot be parsed',
+    'boot() returns a failure Result and empty employees when an employee '
+    'knowledge document cannot be parsed',
     () async {
       final employeeDir = Directory('${tempDir.path}/employees/marketing');
       _writeEmployeeMd(
@@ -290,31 +316,39 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isFalse);
+      expect(bootResult.result.success, isFalse);
+      expect(bootResult.employees, isEmpty);
     },
   );
 
-  test('boot() returns Result.failure when EmployeeFactory throws', () async {
-    final employeeDir = Directory('${tempDir.path}/employees/marketing');
-    _writeEmployeeMd(
-      employeeDir,
-      id: 'marketing',
-      name: 'Marketing Employee',
-      role: 'Marketing',
-    );
-    Directory('${employeeDir.path}/knowledge').createSync();
-    Directory('${employeeDir.path}/prompts').createSync();
-    Directory('${tempDir.path}/knowledge').createSync();
-    Directory('${tempDir.path}/prompts').createSync();
+  test(
+    'boot() returns a failure Result and empty employees when '
+    'EmployeeFactory throws',
+    () async {
+      final employeeDir = Directory('${tempDir.path}/employees/marketing');
+      _writeEmployeeMd(
+        employeeDir,
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      );
+      Directory('${employeeDir.path}/knowledge').createSync();
+      Directory('${employeeDir.path}/prompts').createSync();
+      Directory('${tempDir.path}/knowledge').createSync();
+      Directory('${tempDir.path}/prompts').createSync();
 
-    final bootstrap = _bootstrap(employeeFactory: _ThrowingEmployeeFactory());
+      final bootstrap = _bootstrap(
+        employeeFactory: _ThrowingEmployeeFactory(),
+      );
 
-    final result = await bootstrap.boot(LocalHQSource(tempDir.path));
+      final bootResult = await bootstrap.boot(LocalHQSource(tempDir.path));
 
-    expect(result.success, isFalse);
-  });
+      expect(bootResult.result.success, isFalse);
+      expect(bootResult.employees, isEmpty);
+    },
+  );
 
   test(
     'boot() assembles a full EmployeeRuntime through EmployeeRepository -> '
@@ -340,11 +374,11 @@ void main() {
 
       final factory = _CapturingEmployeeFactory();
 
-      final result = await _bootstrap(
+      final bootResult = await _bootstrap(
         employeeFactory: factory,
       ).boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isTrue);
+      expect(bootResult.result.success, isTrue);
       expect(factory.created, hasLength(1));
       expect(factory.created.first.definition.id, 'marketing');
       expect(factory.created.first.knowledge, hasLength(1));
@@ -354,6 +388,7 @@ void main() {
         factory.created.first.prompts.first.content,
         'You are a marketing employee.',
       );
+      expect(bootResult.employees, [factory.created.first]);
     },
   );
 
@@ -376,14 +411,16 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isTrue);
+      expect(bootResult.result.success, isTrue);
+      expect(bootResult.employees, hasLength(2));
     },
   );
 
   test(
-    'boot() returns Result.failure when a prompt file cannot be read',
+    'boot() returns a failure Result and empty employees when a prompt '
+    'file cannot be read',
     () async {
       final employeeDir = Directory('${tempDir.path}/employees/marketing');
       _writeEmployeeMd(
@@ -400,9 +437,10 @@ void main() {
       Directory('${tempDir.path}/knowledge').createSync();
       Directory('${tempDir.path}/prompts').createSync();
 
-      final result = await _bootstrap().boot(LocalHQSource(tempDir.path));
+      final bootResult = await _bootstrap().boot(LocalHQSource(tempDir.path));
 
-      expect(result.success, isFalse);
+      expect(bootResult.result.success, isFalse);
+      expect(bootResult.employees, isEmpty);
     },
   );
 }

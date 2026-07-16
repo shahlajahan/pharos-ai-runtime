@@ -43,8 +43,8 @@ class Runtime {
     if (_bootstrap != null && source != null) {
       final bootResult = await _bootstrap.boot(source);
 
-      if (!bootResult.success) {
-        return bootResult;
+      if (!bootResult.result.success) {
+        return bootResult.result;
       }
     }
 

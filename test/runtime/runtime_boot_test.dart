@@ -5,6 +5,7 @@ import 'package:pharos_ai_runtime/employees/employee_repository.dart';
 import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
 import 'package:pharos_ai_runtime/hq/employee_loader.dart';
+import 'package:pharos_ai_runtime/hq/hq_boot_result.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
@@ -43,7 +44,8 @@ class _SucceedingBootstrap extends HQBootstrap {
       );
 
   @override
-  Future<Result> boot(HQSource source) async => Result.success('booted');
+  Future<HQBootResult> boot(HQSource source) async =>
+      HQBootResult(result: Result.success('booted'), employees: const []);
 }
 
 class _FailingBootstrap extends HQBootstrap {
@@ -55,7 +57,10 @@ class _FailingBootstrap extends HQBootstrap {
       );
 
   @override
-  Future<Result> boot(HQSource source) async => Result.failure('boot failed');
+  Future<HQBootResult> boot(HQSource source) async => HQBootResult(
+    result: Result.failure('boot failed'),
+    employees: const [],
+  );
 }
 
 class _SpyAgent extends Agent {
