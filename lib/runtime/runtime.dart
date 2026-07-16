@@ -6,6 +6,7 @@ import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_request.dart';
 
 class Runtime {
   Runtime({
@@ -48,5 +49,10 @@ class Runtime {
     }
 
     return _pipeline.run(agent);
+  }
+
+  // ignore: unused_element
+  ModelRequest _buildModelRequest() {
+    return const ModelRequest(systemPrompt: '', userPrompt: '');
   }
 }
