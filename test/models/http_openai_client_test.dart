@@ -4,6 +4,7 @@ import 'package:pharos_ai_runtime/models/http_openai_client.dart';
 import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
+import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
 import 'package:test/test.dart';
 
@@ -178,7 +179,7 @@ void main() {
     expect(result.text, 'Paris.');
   });
 
-  test('complete() throws StateError for a 401 error response', () async {
+  test('complete() throws OpenAIException for a 401 error response', () async {
     final transport = _FakeHttpTransport()
       ..responseBody =
           '{"error": {"message": "Incorrect API key provided.", '
@@ -192,7 +193,7 @@ void main() {
     expect(
       () => client.complete(request, modelConfig, openAiConfig),
       throwsA(
-        isA<StateError>().having(
+        isA<OpenAIException>().having(
           (e) => e.message,
           'message',
           contains('OpenAI API error: Incorrect API key provided.'),
@@ -201,7 +202,7 @@ void main() {
     );
   });
 
-  test('complete() throws StateError for a 404 error response', () async {
+  test('complete() throws OpenAIException for a 404 error response', () async {
     final transport = _FakeHttpTransport()
       ..responseBody =
           '{"error": {"message": "Unknown request URL.", '
@@ -215,7 +216,7 @@ void main() {
     expect(
       () => client.complete(request, modelConfig, openAiConfig),
       throwsA(
-        isA<StateError>().having(
+        isA<OpenAIException>().having(
           (e) => e.message,
           'message',
           contains('OpenAI API error: Unknown request URL.'),
@@ -224,7 +225,7 @@ void main() {
     );
   });
 
-  test('complete() throws StateError for a 429 error response', () async {
+  test('complete() throws OpenAIException for a 429 error response', () async {
     final transport = _FakeHttpTransport()
       ..responseBody =
           '{"error": {"message": "You exceeded your current quota, '
@@ -239,7 +240,7 @@ void main() {
     expect(
       () => client.complete(request, modelConfig, openAiConfig),
       throwsA(
-        isA<StateError>().having(
+        isA<OpenAIException>().having(
           (e) => e.message,
           'message',
           contains(
@@ -251,7 +252,7 @@ void main() {
     );
   });
 
-  test('complete() throws StateError for a 500 error response', () async {
+  test('complete() throws OpenAIException for a 500 error response', () async {
     final transport = _FakeHttpTransport()
       ..responseBody =
           '{"error": {"message": "The server had an error while '
@@ -266,7 +267,7 @@ void main() {
     expect(
       () => client.complete(request, modelConfig, openAiConfig),
       throwsA(
-        isA<StateError>().having(
+        isA<OpenAIException>().having(
           (e) => e.message,
           'message',
           contains(

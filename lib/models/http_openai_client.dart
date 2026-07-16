@@ -4,6 +4,7 @@ import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/openai_client.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
+import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/models/openai_result.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
 
@@ -46,7 +47,7 @@ class HttpOpenAIClient extends OpenAIClient {
 
     if (decoded.containsKey('error')) {
       final error = decoded['error'] as Map<String, dynamic>;
-      throw StateError('OpenAI API error: ${error['message']}');
+      throw OpenAIException('OpenAI API error: ${error['message']}');
     }
 
     final choices = decoded['choices'] as List<dynamic>;
