@@ -13,6 +13,7 @@ import 'package:pharos_ai_runtime/hq/hq_validator.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
@@ -148,6 +149,13 @@ class _OpenAIExceptionModelProvider extends ModelProvider {
   @override
   Future<ModelResponse> generate(ModelRequest request) async {
     throw const OpenAIException('rate limit exceeded');
+  }
+}
+
+class _CustomModelExceptionModelProvider extends ModelProvider {
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async {
+    throw const ModelException('custom model failure');
   }
 }
 
@@ -498,6 +506,33 @@ void main() {
     expect(result, isNotNull);
     expect(result!.success, isFalse);
     expect(result.message, 'rate limit exceeded');
+  });
+
+  test('Runtime converts any ModelException (not just OpenAIException) into '
+      'Result.failure(message) on the HQ path', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final runtime = Runtime(
+      modelProvider: _CustomModelExceptionModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    final result = await runtime.run([
+      'marketing',
+    ], source: _PlaceholderHQSource());
+
+    expect(result, isNotNull);
+    expect(result!.success, isFalse);
+    expect(result.message, 'custom model failure');
   });
 
   test('Runtime lets StateError propagate uncaught on the HQ path', () async {
