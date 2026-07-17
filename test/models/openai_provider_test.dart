@@ -4,6 +4,7 @@ import 'package:pharos_ai_runtime/models/openai_client.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
 import 'package:pharos_ai_runtime/models/openai_provider.dart';
 import 'package:pharos_ai_runtime/models/openai_result.dart';
+import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:test/test.dart';
 
 class _FakeOpenAIClient extends OpenAIClient {
@@ -86,5 +87,24 @@ void main() {
     final response = await provider.generate(request);
 
     expect(response.text, 'Paris is the capital of France.');
+  });
+
+  test('generate() forwards request.tools unchanged', () async {
+    final client = _FakeOpenAIClient();
+    final provider = OpenAIProvider(
+      client: client,
+      modelConfig: modelConfig,
+      openAiConfig: openAiConfig,
+    );
+    const requestWithTools = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+      tools: [ToolDefinition(id: 'search', description: 'Search the web.')],
+    );
+
+    await provider.generate(requestWithTools);
+
+    expect(client.capturedRequest, same(requestWithTools));
+    expect(client.capturedRequest!.tools, requestWithTools.tools);
   });
 }

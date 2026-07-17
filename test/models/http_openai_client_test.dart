@@ -7,6 +7,7 @@ import 'package:pharos_ai_runtime/models/openai_config.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
 import 'package:pharos_ai_runtime/network/http_transport_response.dart';
+import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:test/test.dart';
 
 class _FakeHttpTransport extends HttpTransport {
@@ -459,6 +460,110 @@ void main() {
       throwsA(
         isA<OpenAIException>().having((e) => e.message, 'message', 'HTTP 503'),
       ),
+    );
+  });
+
+  test('complete() omits the tools key when request.tools is empty', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    await client.complete(request, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    expect(decoded.containsKey('tools'), isFalse);
+  });
+
+  test('complete() serializes a single tool correctly', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithTools = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+      tools: [ToolDefinition(id: 'search', description: 'Search the web.')],
+    );
+
+    await client.complete(requestWithTools, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    expect(decoded['tools'], [
+      {
+        'type': 'function',
+        'function': {'name': 'search', 'description': 'Search the web.'},
+      },
+    ]);
+  });
+
+  test(
+    'complete() serializes multiple tools correctly, preserving order',
+    () async {
+      final transport = _FakeHttpTransport();
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+      );
+      const requestWithTools = ModelRequest(
+        systemPrompt: 'You are a helpful assistant.',
+        userPrompt: 'What is the capital of France?',
+        tools: [
+          ToolDefinition(id: 'search', description: 'Search the web.'),
+          ToolDefinition(id: 'calculator', description: 'Evaluate math.'),
+        ],
+      );
+
+      await client.complete(requestWithTools, modelConfig, openAiConfig);
+
+      final decoded =
+          jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+      expect(decoded['tools'], [
+        {
+          'type': 'function',
+          'function': {'name': 'search', 'description': 'Search the web.'},
+        },
+        {
+          'type': 'function',
+          'function': {'name': 'calculator', 'description': 'Evaluate math.'},
+        },
+      ]);
+    },
+  );
+
+  test('complete() still encodes model, temperature, and messages unchanged '
+      'when tools are present', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithTools = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+      tools: [ToolDefinition(id: 'search', description: 'Search the web.')],
+    );
+
+    await client.complete(requestWithTools, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    expect(decoded['model'], 'gpt-4');
+    expect(decoded['temperature'], 0.7);
+
+    final messages = decoded['messages'] as List<dynamic>;
+    expect(
+      (messages[0] as Map<String, dynamic>)['content'],
+      'You are a helpful assistant.',
+    );
+    expect(
+      (messages[1] as Map<String, dynamic>)['content'],
+      'What is the capital of France?',
     );
   });
 }

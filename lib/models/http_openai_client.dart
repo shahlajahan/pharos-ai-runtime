@@ -35,6 +35,15 @@ class HttpOpenAIClient extends OpenAIClient {
         {'role': 'system', 'content': request.systemPrompt},
         {'role': 'user', 'content': request.userPrompt},
       ],
+      if (request.tools.isNotEmpty)
+        'tools': request.tools
+            .map(
+              (tool) => {
+                'type': 'function',
+                'function': {'name': tool.id, 'description': tool.description},
+              },
+            )
+            .toList(),
     });
 
     final response = await _transport.post(
