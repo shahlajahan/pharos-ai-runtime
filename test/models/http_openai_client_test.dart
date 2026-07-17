@@ -8,6 +8,7 @@ import 'package:pharos_ai_runtime/models/openai_config.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
 import 'package:pharos_ai_runtime/network/http_transport_response.dart';
+import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:test/test.dart';
@@ -907,4 +908,211 @@ void main() {
       },
     ]);
   });
+
+  test('complete() serializes a SystemMessage correctly', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithSystemOnly = ModelRequest(
+      conversation: Conversation(
+        messages: [SystemMessage(content: 'You are a helpful assistant.')],
+      ),
+    );
+
+    await client.complete(requestWithSystemOnly, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    final messages = decoded['messages'] as List<dynamic>;
+
+    expect(messages, [
+      {'role': 'system', 'content': 'You are a helpful assistant.'},
+    ]);
+  });
+
+  test('complete() serializes a UserMessage correctly', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithUserOnly = ModelRequest(
+      conversation: Conversation(
+        messages: [UserMessage(content: 'What is the capital of France?')],
+      ),
+    );
+
+    await client.complete(requestWithUserOnly, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    final messages = decoded['messages'] as List<dynamic>;
+
+    expect(messages, [
+      {'role': 'user', 'content': 'What is the capital of France?'},
+    ]);
+  });
+
+  test(
+    'complete() serializes an AssistantMessage without tool calls correctly',
+    () async {
+      final transport = _FakeHttpTransport();
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+      );
+      const requestWithAssistant = ModelRequest(
+        conversation: Conversation(
+          messages: [
+            AssistantMessage(content: 'Paris is the capital of France.'),
+          ],
+        ),
+      );
+
+      await client.complete(requestWithAssistant, modelConfig, openAiConfig);
+
+      final decoded =
+          jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+      final messages = decoded['messages'] as List<dynamic>;
+
+      expect(messages, [
+        {'role': 'assistant', 'content': 'Paris is the capital of France.'},
+      ]);
+    },
+  );
+
+  test(
+    'complete() serializes an AssistantMessage with tool calls correctly',
+    () async {
+      final transport = _FakeHttpTransport();
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+      );
+      const requestWithAssistant = ModelRequest(
+        conversation: Conversation(
+          messages: [
+            AssistantMessage(
+              content: '',
+              toolCalls: [
+                ToolCall(
+                  id: 'call_1',
+                  name: 'search',
+                  arguments: '{"query":"Paris"}',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+
+      await client.complete(requestWithAssistant, modelConfig, openAiConfig);
+
+      final decoded =
+          jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+      final messages = decoded['messages'] as List<dynamic>;
+
+      expect(messages, [
+        {
+          'role': 'assistant',
+          'content': '',
+          'tool_calls': [
+            {
+              'id': 'call_1',
+              'type': 'function',
+              'function': {'name': 'search', 'arguments': '{"query":"Paris"}'},
+            },
+          ],
+        },
+      ]);
+    },
+  );
+
+  test('complete() serializes a ToolMessage correctly', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithToolMessage = ModelRequest(
+      conversation: Conversation(
+        messages: [
+          ToolMessage(
+            toolCallId: 'call_1',
+            toolName: 'search',
+            content: 'Paris is the capital of France.',
+          ),
+        ],
+      ),
+    );
+
+    await client.complete(requestWithToolMessage, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    final messages = decoded['messages'] as List<dynamic>;
+
+    expect(messages, [
+      {
+        'role': 'tool',
+        'tool_call_id': 'call_1',
+        'content': 'Paris is the capital of France.',
+      },
+    ]);
+  });
+
+  test(
+    'complete() preserves order across mixed Conversation message types',
+    () async {
+      final transport = _FakeHttpTransport();
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+      );
+      const requestWithMixedConversation = ModelRequest(
+        conversation: Conversation(
+          messages: [
+            SystemMessage(content: 'You are a helpful assistant.'),
+            UserMessage(content: 'What is the capital of France?'),
+            AssistantMessage(
+              content: '',
+              toolCalls: [
+                ToolCall(
+                  id: 'call_1',
+                  name: 'search',
+                  arguments: '{"query":"Paris"}',
+                ),
+              ],
+            ),
+            ToolMessage(
+              toolCallId: 'call_1',
+              toolName: 'search',
+              content: 'Paris is the capital of France.',
+            ),
+            AssistantMessage(content: 'Paris is the capital of France.'),
+          ],
+        ),
+      );
+
+      await client.complete(
+        requestWithMixedConversation,
+        modelConfig,
+        openAiConfig,
+      );
+
+      final decoded =
+          jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+      final messages = decoded['messages'] as List<dynamic>;
+
+      expect(
+        messages.map((m) => (m as Map<String, dynamic>)['role']).toList(),
+        ['system', 'user', 'assistant', 'tool', 'assistant'],
+      );
+    },
+  );
 }

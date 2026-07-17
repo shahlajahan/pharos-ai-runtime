@@ -30,7 +30,7 @@ class HttpOpenAIClient extends OpenAIClient {
         'OpenAI-Organization': openAiConfig.organization!,
     };
 
-    final conversationMessages = <Map<String, String>>[];
+    final conversationMessages = <Map<String, dynamic>>[];
 
     for (final message in request.conversation.messages) {
       if (message is SystemMessage) {
@@ -40,6 +40,34 @@ class HttpOpenAIClient extends OpenAIClient {
         });
       } else if (message is UserMessage) {
         conversationMessages.add({'role': 'user', 'content': message.content});
+      } else if (message is AssistantMessage) {
+        final assistantMessage = <String, dynamic>{
+          'role': 'assistant',
+          'content': message.content,
+        };
+
+        if (message.toolCalls.isNotEmpty) {
+          assistantMessage['tool_calls'] = message.toolCalls
+              .map(
+                (toolCall) => {
+                  'id': toolCall.id,
+                  'type': 'function',
+                  'function': {
+                    'name': toolCall.name,
+                    'arguments': toolCall.arguments,
+                  },
+                },
+              )
+              .toList();
+        }
+
+        conversationMessages.add(assistantMessage);
+      } else if (message is ToolMessage) {
+        conversationMessages.add({
+          'role': 'tool',
+          'tool_call_id': message.toolCallId,
+          'content': message.content,
+        });
       }
     }
 
