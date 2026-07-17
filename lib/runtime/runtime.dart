@@ -6,12 +6,15 @@ import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/conversation.dart';
+import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
+import 'package:pharos_ai_runtime/runtime/streaming_response_aggregator.dart';
 import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
@@ -47,6 +50,8 @@ class Runtime {
   final HQBootstrapper? _bootstrap;
   final ToolRegistry _toolRegistry;
   final ToolInvoker _toolInvoker;
+  final StreamingResponseAggregator _streamingAggregator =
+      StreamingResponseAggregator();
 
   Future<Result?> run(List<String> args, {HQSource? source}) async {
     if (args.isEmpty) {
@@ -148,6 +153,18 @@ class Runtime {
     final response = await modelProvider.generate(request);
 
     return _pipeline.run(agent);
+  }
+
+  /// Internal streaming pipeline: ModelProvider.stream() ->
+  /// StreamingResponseAggregator -> ModelResponse. Not wired into run();
+  /// no public streaming API is exposed by this.
+  Future<ModelResponse> streamAndAggregate(
+    ModelRequest request,
+    ModelConfig modelConfig,
+  ) async {
+    final streamingResponse = await modelProvider.stream(request, modelConfig);
+
+    return _streamingAggregator.aggregate(streamingResponse);
   }
 
   ModelRequest _buildModelRequest() {

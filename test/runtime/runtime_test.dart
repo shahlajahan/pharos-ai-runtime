@@ -1278,4 +1278,50 @@ void main() {
 
     expect(modelProvider.streamCallCount, 0);
   });
+
+  test('streamAndAggregate() calls modelProvider.stream() with the given '
+      'request and modelConfig', () async {
+    const request = ModelRequest(conversation: Conversation());
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [ModelResponseChunk(isFinished: true)];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    await runtime.streamAndAggregate(request, modelConfig);
+
+    expect(modelProvider.streamCallCount, 1);
+    expect(modelProvider.capturedStreamRequest, same(request));
+    expect(modelProvider.capturedStreamModelConfig, same(modelConfig));
+  });
+
+  test(
+    'streamAndAggregate() returns the StreamingResponseAggregator-aggregated '
+    'ModelResponse',
+    () async {
+      const request = ModelRequest(conversation: Conversation());
+      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+      const toolCall = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
+      final modelProvider = _StreamingModelProvider()
+        ..chunks = const [
+          ModelResponseChunk(textDelta: 'Hello'),
+          ModelResponseChunk(textDelta: ' world'),
+          ModelResponseChunk(toolCalls: [toolCall]),
+          ModelResponseChunk(isFinished: true),
+        ];
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+      );
+
+      final response = await runtime.streamAndAggregate(request, modelConfig);
+
+      expect(response.text, 'Hello world');
+      expect(response.toolCalls, [toolCall]);
+    },
+  );
 }
