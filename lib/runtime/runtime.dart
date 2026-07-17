@@ -6,12 +6,15 @@ import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/conversation.dart';
+import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
+import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
@@ -148,6 +151,35 @@ class Runtime {
     final response = await modelProvider.generate(request);
 
     return _pipeline.run(agent);
+  }
+
+  /// Internal streaming execution path. Consumes a StreamingResponse and
+  /// accumulates its chunks into the same ModelResponse shape generate()
+  /// would return. Not wired into run(); no public streaming API yet.
+  Future<ModelResponse> runStreaming(
+    ModelRequest request,
+    ModelConfig modelConfig,
+  ) async {
+    final streamingResponse = await modelProvider.stream(request, modelConfig);
+
+    final textBuffer = StringBuffer();
+    final toolCalls = <ToolCall>[];
+
+    await for (final chunk in streamingResponse.stream) {
+      if (chunk.textDelta != null) {
+        textBuffer.write(chunk.textDelta);
+      }
+
+      if (chunk.toolCalls != null) {
+        toolCalls.addAll(chunk.toolCalls!);
+      }
+
+      if (chunk.isFinished) {
+        break;
+      }
+    }
+
+    return ModelResponse(text: textBuffer.toString(), toolCalls: toolCalls);
   }
 
   ModelRequest _buildModelRequest() {

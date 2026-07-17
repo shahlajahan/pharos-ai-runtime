@@ -7,11 +7,13 @@ import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
+import 'package:pharos_ai_runtime/models/streaming_response.dart';
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
@@ -194,6 +196,37 @@ class _TwoStepModelProvider extends ModelProvider {
     capturedRequests.add(request);
 
     return callCount == 1 ? firstResponse : secondResponse;
+  }
+}
+
+class _FakeStreamingResponse implements StreamingResponse {
+  const _FakeStreamingResponse(this.stream);
+
+  @override
+  final Stream<ModelResponseChunk> stream;
+}
+
+class _StreamingModelProvider extends ModelProvider {
+  ModelResponse generateResponse = const ModelResponse(text: 'ok');
+  List<ModelResponseChunk> chunks = const [];
+  int streamCallCount = 0;
+  ModelRequest? capturedStreamRequest;
+  ModelConfig? capturedStreamModelConfig;
+
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async =>
+      generateResponse;
+
+  @override
+  Future<StreamingResponse> stream(
+    ModelRequest request,
+    ModelConfig modelConfig,
+  ) async {
+    streamCallCount++;
+    capturedStreamRequest = request;
+    capturedStreamModelConfig = modelConfig;
+
+    return _FakeStreamingResponse(Stream.fromIterable(chunks));
   }
 }
 
@@ -1230,5 +1263,138 @@ void main() {
     await runtime.run(['marketing'], source: _PlaceholderHQSource());
 
     expect(modelProvider.capturedRequests, hasLength(1));
+  });
+
+  test('runStreaming() calls modelProvider.stream() with the given request '
+      'and modelConfig', () async {
+    const request = ModelRequest(conversation: Conversation());
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [ModelResponseChunk(isFinished: true)];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    await runtime.runStreaming(request, modelConfig);
+
+    expect(modelProvider.streamCallCount, 1);
+    expect(modelProvider.capturedStreamRequest, same(request));
+    expect(modelProvider.capturedStreamModelConfig, same(modelConfig));
+  });
+
+  test('runStreaming() accumulates multiple textDelta chunks into the final '
+      'ModelResponse.text', () async {
+    const request = ModelRequest(conversation: Conversation());
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [
+        ModelResponseChunk(textDelta: 'Hello'),
+        ModelResponseChunk(textDelta: ' world'),
+        ModelResponseChunk(isFinished: true),
+      ];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    final response = await runtime.runStreaming(request, modelConfig);
+
+    expect(response.text, 'Hello world');
+  });
+
+  test('runStreaming() accumulates toolCalls chunks into the final '
+      'ModelResponse.toolCalls, preserving order', () async {
+    const request = ModelRequest(conversation: Conversation());
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const toolCall1 = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
+    const toolCall2 = ToolCall(
+      id: 'call_2',
+      name: 'calculator',
+      arguments: '{}',
+    );
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [
+        ModelResponseChunk(toolCalls: [toolCall1]),
+        ModelResponseChunk(toolCalls: [toolCall2]),
+        ModelResponseChunk(isFinished: true),
+      ];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    final response = await runtime.runStreaming(request, modelConfig);
+
+    expect(response.toolCalls, [toolCall1, toolCall2]);
+  });
+
+  test(
+    'runStreaming() stops consuming chunks once isFinished is true',
+    () async {
+      const request = ModelRequest(conversation: Conversation());
+      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+      final modelProvider = _StreamingModelProvider()
+        ..chunks = const [
+          ModelResponseChunk(textDelta: 'Hello'),
+          ModelResponseChunk(isFinished: true),
+          ModelResponseChunk(textDelta: 'ignored'),
+        ];
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+      );
+
+      final response = await runtime.runStreaming(request, modelConfig);
+
+      expect(response.text, 'Hello');
+    },
+  );
+
+  test('runStreaming() produces a ModelResponse identical to what generate() '
+      'returns for equivalent content', () async {
+    const request = ModelRequest(conversation: Conversation());
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const toolCall = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
+    final modelProvider = _StreamingModelProvider()
+      ..generateResponse = const ModelResponse(
+        text: 'Hello world',
+        toolCalls: [toolCall],
+      )
+      ..chunks = const [
+        ModelResponseChunk(textDelta: 'Hello'),
+        ModelResponseChunk(textDelta: ' world'),
+        ModelResponseChunk(toolCalls: [toolCall]),
+        ModelResponseChunk(isFinished: true),
+      ];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    final streamedResponse = await runtime.runStreaming(request, modelConfig);
+    final generatedResponse = await modelProvider.generate(request);
+
+    expect(streamedResponse.text, generatedResponse.text);
+    expect(streamedResponse.toolCalls, generatedResponse.toolCalls);
+  });
+
+  test('run() does not call modelProvider.stream() on the existing '
+      'synchronous path', () async {
+    final modelProvider = _StreamingModelProvider();
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    await runtime.run(['marketing']);
+
+    expect(modelProvider.streamCallCount, 0);
   });
 }
