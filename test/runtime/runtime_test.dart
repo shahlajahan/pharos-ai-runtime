@@ -74,6 +74,7 @@ class _SpyModelProvider extends MockModelProvider {
 class _SpyRuntimeRequestBuilder extends RuntimeRequestBuilder {
   int callCount = 0;
   EmployeeRuntime? capturedEmployee;
+  List<ToolDefinition>? capturedTools;
 
   @override
   ModelRequest build(
@@ -82,6 +83,7 @@ class _SpyRuntimeRequestBuilder extends RuntimeRequestBuilder {
   }) {
     callCount++;
     capturedEmployee = employee;
+    capturedTools = tools;
 
     return const ModelRequest(systemPrompt: '', userPrompt: '');
   }
@@ -604,4 +606,61 @@ void main() {
       returnsNormally,
     );
   });
+
+  test(
+    'Runtime forwards ToolRegistry.definitions() into RuntimeRequestBuilder',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      const definition = ToolDefinition(
+        id: 'search',
+        description: 'Search the web.',
+      );
+      final requestBuilder = _SpyRuntimeRequestBuilder();
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: requestBuilder,
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+        toolRegistry: const ToolRegistry(definitions: {'search': definition}),
+      );
+
+      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+      expect(requestBuilder.capturedTools, [definition]);
+    },
+  );
+
+  test(
+    'Runtime forwards an empty tool list when no ToolRegistry is provided',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      final requestBuilder = _SpyRuntimeRequestBuilder();
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: requestBuilder,
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+      );
+
+      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+      expect(requestBuilder.capturedTools, isEmpty);
+    },
+  );
 }

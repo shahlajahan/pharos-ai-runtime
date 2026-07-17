@@ -1,6 +1,7 @@
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/tooling/tool.dart';
 import 'package:pharos_ai_runtime/tooling/tool_context.dart';
+import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
 
@@ -26,5 +27,21 @@ void main() {
 
     expect(registry.find('fake-tool'), same(tool));
     expect(registry.find('missing'), isNull);
+  });
+
+  test('ToolRegistry.definitions() returns an empty list when empty', () {
+    const registry = ToolRegistry();
+
+    expect(registry.definitions(), isEmpty);
+  });
+
+  test('ToolRegistry.definitions() returns the stored ToolDefinitions', () {
+    const definition = ToolDefinition(
+      id: 'fake-tool',
+      description: 'A fake tool.',
+    );
+    const registry = ToolRegistry(definitions: {'fake-tool': definition});
+
+    expect(registry.definitions(), [definition]);
   });
 }

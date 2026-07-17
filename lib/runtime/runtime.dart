@@ -38,7 +38,6 @@ class Runtime {
   final Logger _logger;
   final ExecutionPipeline _pipeline;
   final HQBootstrapper? _bootstrap;
-  // ignore: unused_field
   final ToolRegistry _toolRegistry;
 
   Future<Result?> run(List<String> args, {HQSource? source}) async {
@@ -75,7 +74,10 @@ class Runtime {
         return Result.failure('Employee "${args.first}" not found.');
       }
 
-      final request = _requestBuilder.build(selectedEmployee);
+      final request = _requestBuilder.build(
+        selectedEmployee,
+        tools: _toolRegistry.definitions(),
+      );
 
       try {
         final response = await modelProvider.generate(request);
