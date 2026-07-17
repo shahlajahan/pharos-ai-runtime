@@ -776,7 +776,8 @@ void main() {
     expect((messages[1] as Map<String, dynamic>)['role'], 'user');
   });
 
-  test('complete() serializes a single ToolOutput as a tool message', () async {
+  test('complete() ignores request.toolOutputs and does not serialize a tool '
+      'message for it', () async {
     final transport = _FakeHttpTransport();
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
@@ -805,16 +806,16 @@ void main() {
     final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
     final messages = decoded['messages'] as List<dynamic>;
 
-    expect(messages, hasLength(3));
-    expect(messages[2], {
-      'role': 'tool',
-      'tool_call_id': 'call_1',
-      'content': 'Paris is the capital of France.',
-    });
+    expect(messages, hasLength(2));
+    expect(
+      messages.any(
+        (message) => (message as Map<String, dynamic>)['role'] == 'tool',
+      ),
+      isFalse,
+    );
   });
 
-  test('complete() serializes multiple ToolOutputs as tool messages, '
-      'preserving order', () async {
+  test('complete() ignores multiple entries in request.toolOutputs', () async {
     final transport = _FakeHttpTransport();
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
@@ -849,17 +850,54 @@ void main() {
     final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
     final messages = decoded['messages'] as List<dynamic>;
 
-    expect(messages, hasLength(4));
-    expect(messages[2], {
-      'role': 'tool',
-      'tool_call_id': 'call_1',
-      'content': 'first output',
-    });
-    expect(messages[3], {
-      'role': 'tool',
-      'tool_call_id': 'call_2',
-      'content': 'second output',
-    });
+    expect(messages, hasLength(2));
+  });
+
+  test('complete() serializes only the Conversation ToolMessage when '
+      'request.toolOutputs duplicates the same tool result', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithDuplicate = ModelRequest(
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+          AssistantMessage(
+            content: '',
+            toolCalls: [
+              ToolCall(id: 'call_1', name: 'search', arguments: '{}'),
+            ],
+          ),
+          ToolMessage(
+            toolCallId: 'call_1',
+            toolName: 'search',
+            content: 'Paris is the capital of France.',
+          ),
+        ],
+      ),
+      toolOutputs: [
+        ToolOutput(
+          toolCallId: 'call_1',
+          toolName: 'search',
+          success: true,
+          content: 'Paris is the capital of France.',
+        ),
+      ],
+    );
+
+    await client.complete(requestWithDuplicate, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    final messages = decoded['messages'] as List<dynamic>;
+    final toolMessages = messages.where(
+      (message) => (message as Map<String, dynamic>)['role'] == 'tool',
+    );
+
+    expect(toolMessages, hasLength(1));
   });
 
   test('complete() does not touch the system message, user message, or '
@@ -893,6 +931,7 @@ void main() {
     final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
     final messages = decoded['messages'] as List<dynamic>;
 
+    expect(messages, hasLength(2));
     expect(
       (messages[0] as Map<String, dynamic>)['content'],
       'You are a helpful assistant.',

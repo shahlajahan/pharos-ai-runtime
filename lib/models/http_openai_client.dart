@@ -74,16 +74,7 @@ class HttpOpenAIClient extends OpenAIClient {
     final body = jsonEncode({
       'model': modelConfig.model,
       'temperature': modelConfig.temperature,
-      'messages': [
-        ...conversationMessages,
-        ...request.toolOutputs.map(
-          (toolOutput) => {
-            'role': 'tool',
-            'tool_call_id': toolOutput.toolCallId,
-            'content': toolOutput.content,
-          },
-        ),
-      ],
+      'messages': conversationMessages,
       if (request.tools.isNotEmpty)
         'tools': request.tools
             .map(
