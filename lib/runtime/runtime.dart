@@ -12,6 +12,7 @@ import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
+import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 
 class Runtime {
@@ -88,11 +89,19 @@ class Runtime {
       try {
         final response = await modelProvider.generate(request);
 
-        final toolResults = <Result>[];
+        final toolOutputs = <ToolOutput>[];
 
         for (final toolCall in response.toolCalls) {
           final result = await _toolInvoker.invoke(toolCall);
-          toolResults.add(result);
+
+          toolOutputs.add(
+            ToolOutput(
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              success: result.success,
+              content: result.message,
+            ),
+          );
         }
 
         return await _responseHandler.handle(selectedEmployee, response);
