@@ -289,6 +289,81 @@ void main() {
     expect(_userPrompt(request), '');
   });
 
+  test('build() returns a Conversation with exactly two messages', () {
+    final builder = DefaultRuntimeRequestBuilder();
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+
+    final request = builder.build(employee);
+
+    expect(request.conversation.messages, hasLength(2));
+  });
+
+  test('build() returns a Conversation with exactly one SystemMessage', () {
+    final builder = DefaultRuntimeRequestBuilder();
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+
+    final request = builder.build(employee);
+
+    expect(
+      request.conversation.messages.whereType<SystemMessage>(),
+      hasLength(1),
+    );
+  });
+
+  test('build() returns a Conversation with exactly one UserMessage', () {
+    final builder = DefaultRuntimeRequestBuilder();
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+
+    final request = builder.build(employee);
+
+    expect(
+      request.conversation.messages.whereType<UserMessage>(),
+      hasLength(1),
+    );
+  });
+
+  test('build() orders the SystemMessage before the UserMessage', () {
+    final builder = DefaultRuntimeRequestBuilder();
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+
+    final request = builder.build(employee);
+
+    expect(request.conversation.messages[0], isA<SystemMessage>());
+    expect(request.conversation.messages[1], isA<UserMessage>());
+  });
+
   test('build() defaults to an empty tool list when none is provided', () {
     final builder = DefaultRuntimeRequestBuilder();
     const employee = EmployeeRuntime(

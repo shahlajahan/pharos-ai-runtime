@@ -12,11 +12,10 @@ class DefaultRuntimeRequestBuilder extends RuntimeRequestBuilder {
     List<ToolDefinition> tools = const [],
     List<ToolOutput> toolOutputs = const [],
   }) {
-    final header =
-        'You are ${employee.definition.name}.\n'
-        'Your role is ${employee.definition.role}.';
-
-    final sections = <String>[header];
+    final sections = <String>[
+      'You are ${employee.definition.name}.\n'
+          'Your role is ${employee.definition.role}.',
+    ];
 
     if (employee.prompts.isNotEmpty) {
       sections.add(
@@ -30,13 +29,15 @@ class DefaultRuntimeRequestBuilder extends RuntimeRequestBuilder {
       );
     }
 
+    final conversation = Conversation(
+      messages: [
+        SystemMessage(content: sections.join('\n\n')),
+        const UserMessage(content: ''),
+      ],
+    );
+
     return ModelRequest(
-      conversation: Conversation(
-        messages: [
-          SystemMessage(content: sections.join('\n\n')),
-          const UserMessage(content: ''),
-        ],
-      ),
+      conversation: conversation,
       tools: tools,
       toolOutputs: toolOutputs,
     );
