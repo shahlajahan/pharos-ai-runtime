@@ -19,8 +19,10 @@ import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/tooling/tool.dart';
+import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 import 'package:pharos_ai_runtime/tooling/tool_context.dart';
 import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
+import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
 
@@ -165,6 +167,26 @@ class _NoopTool extends Tool {
   @override
   Future<Result> execute(ToolContext context) async {
     return Result.success('noop');
+  }
+}
+
+class _ConfigurableModelProvider extends ModelProvider {
+  ModelResponse response = const ModelResponse(text: 'ok');
+
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async => response;
+}
+
+class _SpyToolInvoker extends ToolInvoker {
+  _SpyToolInvoker() : super(registry: const ToolRegistry());
+
+  final List<String> invokedToolIds = [];
+
+  @override
+  Future<Result> invoke(String toolId) async {
+    invokedToolIds.add(toolId);
+
+    return Result.success('invoked $toolId');
   }
 }
 
@@ -663,4 +685,159 @@ void main() {
       expect(requestBuilder.capturedTools, isEmpty);
     },
   );
+
+  test(
+    'Runtime never invokes ToolInvoker when response.toolCalls is empty',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      final toolInvoker = _SpyToolInvoker();
+      final runtime = Runtime(
+        modelProvider: _ConfigurableModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+        toolInvoker: toolInvoker,
+      );
+
+      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+      expect(toolInvoker.invokedToolIds, isEmpty);
+    },
+  );
+
+  test('Runtime executes a single tool call once', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _ConfigurableModelProvider()
+      ..response = const ModelResponse(
+        text: 'ok',
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+      );
+    final toolInvoker = _SpyToolInvoker();
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+      toolInvoker: toolInvoker,
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    expect(toolInvoker.invokedToolIds, ['search']);
+  });
+
+  test('Runtime executes multiple tool calls sequentially, in order', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _ConfigurableModelProvider()
+      ..response = const ModelResponse(
+        text: 'ok',
+        toolCalls: [
+          ToolCall(id: 'call_1', name: 'search', arguments: '{}'),
+          ToolCall(id: 'call_2', name: 'calculator', arguments: '{}'),
+        ],
+      );
+    final toolInvoker = _SpyToolInvoker();
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+      toolInvoker: toolInvoker,
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    expect(toolInvoker.invokedToolIds, ['search', 'calculator']);
+  });
+
+  test('Runtime still returns the response-handler Result when tool calls '
+      'exist', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _ConfigurableModelProvider()
+      ..response = const ModelResponse(
+        text: 'ok',
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+      );
+    final responseHandler = _SpyEmployeeResponseHandler()
+      ..result = Result.success('handled with tools');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: responseHandler,
+      bootstrap: _StubHQBootstrap([employee]),
+      toolInvoker: _SpyToolInvoker(),
+    );
+
+    final result = await runtime.run([
+      'marketing',
+    ], source: _PlaceholderHQSource());
+
+    expect(result, same(responseHandler.result));
+  });
+
+  test('Runtime does not crash when tool execution fails, and still returns '
+      'the original Result, exactly as ToolInvoker already defines', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _ConfigurableModelProvider()
+      ..response = const ModelResponse(
+        text: 'ok',
+        toolCalls: [
+          ToolCall(id: 'call_1', name: 'unregistered-tool', arguments: '{}'),
+        ],
+      );
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+      toolInvoker: ToolInvoker(registry: const ToolRegistry()),
+    );
+
+    final result = await runtime.run([
+      'marketing',
+    ], source: _PlaceholderHQSource());
+
+    expect(result, isNotNull);
+    expect(result!.success, isTrue);
+  });
 }

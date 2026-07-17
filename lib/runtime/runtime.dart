@@ -11,6 +11,7 @@ import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
+import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 
 class Runtime {
@@ -23,13 +24,17 @@ class Runtime {
     Logger logger = const Logger(),
     HQBootstrapper? bootstrap,
     ToolRegistry? toolRegistry,
+    ToolInvoker? toolInvoker,
   }) : _requestBuilder = requestBuilder,
        _responseHandler = responseHandler,
        _registry = registry ?? AgentRegistry(),
        _logger = logger,
        _pipeline = ExecutionPipeline(config: config, logger: logger),
        _bootstrap = bootstrap,
-       _toolRegistry = toolRegistry ?? const ToolRegistry();
+       _toolRegistry = toolRegistry ?? const ToolRegistry(),
+       _toolInvoker =
+           toolInvoker ??
+           ToolInvoker(registry: toolRegistry ?? const ToolRegistry());
 
   final ModelProvider modelProvider;
   final RuntimeRequestBuilder _requestBuilder;
@@ -39,6 +44,7 @@ class Runtime {
   final ExecutionPipeline _pipeline;
   final HQBootstrapper? _bootstrap;
   final ToolRegistry _toolRegistry;
+  final ToolInvoker _toolInvoker;
 
   Future<Result?> run(List<String> args, {HQSource? source}) async {
     if (args.isEmpty) {
@@ -81,6 +87,10 @@ class Runtime {
 
       try {
         final response = await modelProvider.generate(request);
+
+        for (final toolCall in response.toolCalls) {
+          await _toolInvoker.invoke(toolCall.name);
+        }
 
         return await _responseHandler.handle(selectedEmployee, response);
       } on ModelException catch (e) {
