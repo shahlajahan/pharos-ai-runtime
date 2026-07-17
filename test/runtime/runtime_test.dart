@@ -20,6 +20,7 @@ import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/tooling/tool.dart';
 import 'package:pharos_ai_runtime/tooling/tool_context.dart';
+import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
 
@@ -75,7 +76,10 @@ class _SpyRuntimeRequestBuilder extends RuntimeRequestBuilder {
   EmployeeRuntime? capturedEmployee;
 
   @override
-  ModelRequest build(EmployeeRuntime employee) {
+  ModelRequest build(
+    EmployeeRuntime employee, {
+    List<ToolDefinition> tools = const [],
+  }) {
     callCount++;
     capturedEmployee = employee;
 

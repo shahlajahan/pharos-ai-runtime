@@ -2,13 +2,17 @@ import 'package:pharos_ai_runtime/employees/employee_definition.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
+import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:test/test.dart';
 
 class _FakeRuntimeRequestBuilder extends RuntimeRequestBuilder {
   EmployeeRuntime? capturedEmployee;
 
   @override
-  ModelRequest build(EmployeeRuntime employee) {
+  ModelRequest build(
+    EmployeeRuntime employee, {
+    List<ToolDefinition> tools = const [],
+  }) {
     capturedEmployee = employee;
 
     return const ModelRequest(systemPrompt: '', userPrompt: '');

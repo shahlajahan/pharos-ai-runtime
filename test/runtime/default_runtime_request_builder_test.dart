@@ -3,6 +3,7 @@ import 'package:pharos_ai_runtime/knowledge/knowledge_definition.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_definition.dart';
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
+import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -278,5 +279,43 @@ void main() {
     expect(request.systemPrompt, contains('Ship quality code.'));
     expect(request.systemPrompt, contains('Ship reliable systems.'));
     expect(request.userPrompt, '');
+  });
+
+  test('build() defaults to an empty tool list when none is provided', () {
+    final builder = DefaultRuntimeRequestBuilder();
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+
+    final request = builder.build(employee);
+
+    expect(request.tools, isEmpty);
+  });
+
+  test('build() forwards the given tools unchanged', () {
+    final builder = DefaultRuntimeRequestBuilder();
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const tools = [
+      ToolDefinition(id: 'search', description: 'Search the web.'),
+      ToolDefinition(id: 'calculator', description: 'Evaluate math.'),
+    ];
+
+    final request = builder.build(employee, tools: tools);
+
+    expect(request.tools, same(tools));
   });
 }

@@ -1,4 +1,5 @@
 import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -10,6 +11,29 @@ void main() {
 
     expect(request.systemPrompt, 'You are a helpful assistant.');
     expect(request.userPrompt, 'What is the capital of France?');
+  });
+
+  test('ModelRequest defaults to an empty tool list', () {
+    const request = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+    );
+
+    expect(request.tools, isEmpty);
+  });
+
+  test('ModelRequest preserves the given tool definitions', () {
+    const tools = [
+      ToolDefinition(id: 'search', description: 'Search the web.'),
+      ToolDefinition(id: 'calculator', description: 'Evaluate math.'),
+    ];
+    const request = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+      tools: tools,
+    );
+
+    expect(request.tools, tools);
   });
 
   test('ModelRequest is immutable', () {
