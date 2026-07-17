@@ -190,6 +190,19 @@ class _SpyToolInvoker extends ToolInvoker {
   }
 }
 
+class _FailingSpyToolInvoker extends ToolInvoker {
+  _FailingSpyToolInvoker() : super(registry: const ToolRegistry());
+
+  final List<ToolCall> invokedToolCalls = [];
+
+  @override
+  Future<Result> invoke(ToolCall toolCall) async {
+    invokedToolCalls.add(toolCall);
+
+    return Result.failure('${toolCall.name} failed');
+  }
+}
+
 void main() {
   test('Runtime accepts a ModelProvider', () {
     final modelProvider = MockModelProvider();
@@ -876,5 +889,46 @@ void main() {
 
     expect(result, isNotNull);
     expect(result!.success, isTrue);
+  });
+
+  test('Runtime still invokes every tool call, and still returns the '
+      'response-handler Result, even when tool executions fail', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _ConfigurableModelProvider()
+      ..response = const ModelResponse(
+        text: 'ok',
+        toolCalls: [
+          ToolCall(id: 'call_1', name: 'search', arguments: '{}'),
+          ToolCall(id: 'call_2', name: 'calculator', arguments: '{}'),
+        ],
+      );
+    final toolInvoker = _FailingSpyToolInvoker();
+    final responseHandler = _SpyEmployeeResponseHandler()
+      ..result = Result.success('handled despite tool failures');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: responseHandler,
+      bootstrap: _StubHQBootstrap([employee]),
+      toolInvoker: toolInvoker,
+    );
+
+    final result = await runtime.run([
+      'marketing',
+    ], source: _PlaceholderHQSource());
+
+    expect(toolInvoker.invokedToolCalls.map((call) => call.name), [
+      'search',
+      'calculator',
+    ]);
+    expect(result, same(responseHandler.result));
   });
 }

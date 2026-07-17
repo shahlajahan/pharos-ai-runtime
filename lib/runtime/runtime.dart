@@ -88,8 +88,11 @@ class Runtime {
       try {
         final response = await modelProvider.generate(request);
 
+        final toolResults = <Result>[];
+
         for (final toolCall in response.toolCalls) {
-          await _toolInvoker.invoke(toolCall);
+          final result = await _toolInvoker.invoke(toolCall);
+          toolResults.add(result);
         }
 
         return await _responseHandler.handle(selectedEmployee, response);
