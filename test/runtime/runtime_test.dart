@@ -23,6 +23,7 @@ import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 import 'package:pharos_ai_runtime/tooling/tool_context.dart';
 import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
+import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
 
@@ -77,15 +78,18 @@ class _SpyRuntimeRequestBuilder extends RuntimeRequestBuilder {
   int callCount = 0;
   EmployeeRuntime? capturedEmployee;
   List<ToolDefinition>? capturedTools;
+  List<ToolOutput>? capturedToolOutputs;
 
   @override
   ModelRequest build(
     EmployeeRuntime employee, {
     List<ToolDefinition> tools = const [],
+    List<ToolOutput> toolOutputs = const [],
   }) {
     callCount++;
     capturedEmployee = employee;
     capturedTools = tools;
+    capturedToolOutputs = toolOutputs;
 
     return const ModelRequest(systemPrompt: '', userPrompt: '');
   }
@@ -175,6 +179,21 @@ class _ConfigurableModelProvider extends ModelProvider {
 
   @override
   Future<ModelResponse> generate(ModelRequest request) async => response;
+}
+
+class _TwoStepModelProvider extends ModelProvider {
+  int callCount = 0;
+  List<ModelRequest> capturedRequests = [];
+  ModelResponse firstResponse = const ModelResponse(text: 'first');
+  ModelResponse secondResponse = const ModelResponse(text: 'second');
+
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async {
+    callCount++;
+    capturedRequests.add(request);
+
+    return callCount == 1 ? firstResponse : secondResponse;
+  }
 }
 
 class _SpyToolInvoker extends ToolInvoker {
@@ -930,5 +949,154 @@ void main() {
       'calculator',
     ]);
     expect(result, same(responseHandler.result));
+  });
+
+  test('Runtime calls modelProvider.generate() exactly once when no tool '
+      'calls exist', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _TwoStepModelProvider()
+      ..firstResponse = const ModelResponse(text: 'ok');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    expect(modelProvider.callCount, 1);
+  });
+
+  test('Runtime calls modelProvider.generate() exactly twice when tool '
+      'calls exist', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _TwoStepModelProvider()
+      ..firstResponse = const ModelResponse(
+        text: '',
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+      )
+      ..secondResponse = const ModelResponse(text: 'final answer');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    expect(modelProvider.callCount, 2);
+  });
+
+  test('Runtime sends every ToolOutput in the second request, preserving '
+      'toolCallId and toolName', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const toolCall1 = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
+    const toolCall2 = ToolCall(
+      id: 'call_2',
+      name: 'calculator',
+      arguments: '{}',
+    );
+    final modelProvider = _TwoStepModelProvider()
+      ..firstResponse = const ModelResponse(
+        text: '',
+        toolCalls: [toolCall1, toolCall2],
+      )
+      ..secondResponse = const ModelResponse(text: 'final answer');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    final secondRequest = modelProvider.capturedRequests[1];
+    expect(secondRequest.toolOutputs, hasLength(2));
+    expect(secondRequest.toolOutputs[0].toolCallId, 'call_1');
+    expect(secondRequest.toolOutputs[0].toolName, 'search');
+    expect(secondRequest.toolOutputs[1].toolCallId, 'call_2');
+    expect(secondRequest.toolOutputs[1].toolName, 'calculator');
+  });
+
+  test('Runtime passes the second ModelResponse into EmployeeResponseHandler '
+      'when tool calls were executed', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const secondResponse = ModelResponse(text: 'final answer');
+    final modelProvider = _TwoStepModelProvider()
+      ..firstResponse = const ModelResponse(
+        text: '',
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+      )
+      ..secondResponse = secondResponse;
+    final responseHandler = _SpyEmployeeResponseHandler();
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: responseHandler,
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    expect(responseHandler.capturedResponse, same(secondResponse));
+  });
+
+  test('Runtime makes no second request when no tool calls exist', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _TwoStepModelProvider()
+      ..firstResponse = const ModelResponse(text: 'ok');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    expect(modelProvider.capturedRequests, hasLength(1));
   });
 }

@@ -2,12 +2,14 @@ import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
+import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 
 class DefaultRuntimeRequestBuilder extends RuntimeRequestBuilder {
   @override
   ModelRequest build(
     EmployeeRuntime employee, {
     List<ToolDefinition> tools = const [],
+    List<ToolOutput> toolOutputs = const [],
   }) {
     final header =
         'You are ${employee.definition.name}.\n'
@@ -31,6 +33,7 @@ class DefaultRuntimeRequestBuilder extends RuntimeRequestBuilder {
       systemPrompt: sections.join('\n\n'),
       userPrompt: '',
       tools: tools,
+      toolOutputs: toolOutputs,
     );
   }
 }

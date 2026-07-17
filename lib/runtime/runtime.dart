@@ -89,6 +89,10 @@ class Runtime {
       try {
         final response = await modelProvider.generate(request);
 
+        if (response.toolCalls.isEmpty) {
+          return await _responseHandler.handle(selectedEmployee, response);
+        }
+
         final toolOutputs = <ToolOutput>[];
 
         for (final toolCall in response.toolCalls) {
@@ -104,7 +108,15 @@ class Runtime {
           );
         }
 
-        return await _responseHandler.handle(selectedEmployee, response);
+        final secondRequest = _requestBuilder.build(
+          selectedEmployee,
+          tools: _toolRegistry.definitions(),
+          toolOutputs: toolOutputs,
+        );
+
+        final secondResponse = await modelProvider.generate(secondRequest);
+
+        return await _responseHandler.handle(selectedEmployee, secondResponse);
       } on ModelException catch (e) {
         return Result.failure(e.message);
       }
