@@ -11,8 +11,11 @@ import 'package:pharos_ai_runtime/hq/local_hq_source.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_provider_resolver.dart';
+import 'package:pharos_ai_runtime/models/model_registry.dart';
 import 'package:pharos_ai_runtime/models/openai_environment.dart';
+import 'package:pharos_ai_runtime/models/openai_provider_factory.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
@@ -51,12 +54,18 @@ void main(List<String> arguments) async {
 
   final useOpenAI = Platform.environment['OPENAI_ENABLED'] == 'true';
 
-  final provider = useOpenAI
-      ? ModelProviderResolver.resolve(
-          useOpenAI: true,
-          environment: OpenAIEnvironment.fromMap(Platform.environment),
-        )
-      : MockModelProvider();
+  final providers = <String, ModelProvider>{'mock': MockModelProvider()};
+
+  if (useOpenAI) {
+    providers['openai'] = OpenAIProviderFactory().build(
+      OpenAIEnvironment.fromMap(Platform.environment),
+    );
+  }
+
+  final provider = ModelProviderResolver.resolve(
+    provider: useOpenAI ? 'openai' : 'mock',
+    registry: ModelRegistry(providers: providers),
+  );
 
   final runtime = Runtime(
     modelProvider: provider,

@@ -1,17 +1,16 @@
-import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
-import 'package:pharos_ai_runtime/models/openai_environment.dart';
-import 'package:pharos_ai_runtime/models/openai_provider_factory.dart';
+import 'package:pharos_ai_runtime/models/model_registry.dart';
 
 abstract final class ModelProviderResolver {
   static ModelProvider resolve({
-    required bool useOpenAI,
-    required OpenAIEnvironment environment,
+    required String provider,
+    required ModelRegistry registry,
   }) {
-    if (!useOpenAI) {
-      return MockModelProvider();
+    if (!registry.contains(provider)) {
+      throw ModelException('Unknown model provider: $provider');
     }
 
-    return OpenAIProviderFactory().build(environment);
+    return registry.provider(provider);
   }
 }

@@ -13,8 +13,10 @@ import 'package:pharos_ai_runtime/knowledge/knowledge_repository.dart';
 import 'package:pharos_ai_runtime/knowledge/markdown_knowledge_parser.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_provider_resolver.dart';
+import 'package:pharos_ai_runtime/models/model_registry.dart';
 import 'package:pharos_ai_runtime/models/openai_environment.dart';
 import 'package:pharos_ai_runtime/models/openai_provider.dart';
+import 'package:pharos_ai_runtime/models/openai_provider_factory.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
 import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
@@ -139,11 +141,13 @@ role: Marketing
     expect(result!.success, isTrue);
   });
 
-  test('Default production wiring (useOpenAI: false) resolves to '
-      'MockModelProvider and Runtime starts normally', () async {
+  test('Default production wiring resolves "mock" to MockModelProvider and '
+      'Runtime starts normally', () async {
+    final registry = ModelRegistry(providers: {'mock': MockModelProvider()});
+
     final provider = ModelProviderResolver.resolve(
-      useOpenAI: false,
-      environment: _openAiEnvironment,
+      provider: 'mock',
+      registry: registry,
     );
 
     expect(provider, isA<MockModelProvider>());
@@ -160,11 +164,15 @@ role: Marketing
     expect(result!.success, isTrue);
   });
 
-  test('Production wiring with OPENAI_ENABLED=true constructs an '
-      'OpenAIProvider successfully without performing any HTTP request', () {
+  test('Production wiring resolves "openai" to an OpenAIProvider '
+      'successfully without performing any HTTP request', () {
+    final registry = ModelRegistry(
+      providers: {'openai': OpenAIProviderFactory().build(_openAiEnvironment)},
+    );
+
     final provider = ModelProviderResolver.resolve(
-      useOpenAI: true,
-      environment: _openAiEnvironment,
+      provider: 'openai',
+      registry: registry,
     );
 
     expect(provider, isA<OpenAIProvider>());

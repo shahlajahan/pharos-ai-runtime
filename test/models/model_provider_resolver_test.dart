@@ -1,68 +1,68 @@
-import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
+import 'package:pharos_ai_runtime/models/model_exception.dart';
+import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_provider_resolver.dart';
-import 'package:pharos_ai_runtime/models/openai_environment.dart';
-import 'package:pharos_ai_runtime/models/openai_provider.dart';
+import 'package:pharos_ai_runtime/models/model_registry.dart';
+import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:test/test.dart';
 
-const _environment = OpenAIEnvironment(
-  apiKey: 'sk-test-key',
-  baseUrl: 'https://api.openai.com/v1/chat/completions',
-  model: 'gpt-4',
-  temperature: 0.7,
-);
-
-const _environmentWithOrganization = OpenAIEnvironment(
-  apiKey: 'sk-test-key',
-  baseUrl: 'https://api.openai.com/v1/chat/completions',
-  model: 'gpt-4',
-  temperature: 0.7,
-  organization: 'org-123',
-);
+class _FakeModelProvider extends ModelProvider {
+  @override
+  Future<ModelResponse> generate(ModelRequest request) async {
+    return const ModelResponse(text: 'fake response');
+  }
+}
 
 void main() {
-  test('resolve() returns a MockModelProvider when useOpenAI is false', () {
-    final provider = ModelProviderResolver.resolve(
-      useOpenAI: false,
-      environment: _environment,
+  test('resolve() returns the provider registered under the given name', () {
+    final fakeProvider = _FakeModelProvider();
+    final registry = ModelRegistry(providers: {'fake': fakeProvider});
+
+    final resolved = ModelProviderResolver.resolve(
+      provider: 'fake',
+      registry: registry,
     );
 
-    expect(provider, isA<MockModelProvider>());
+    expect(resolved, same(fakeProvider));
   });
 
-  test('resolve() returns an OpenAIProvider when useOpenAI is true', () {
-    final provider = ModelProviderResolver.resolve(
-      useOpenAI: true,
-      environment: _environment,
-    );
+  test('resolve() throws ModelException for an unknown provider', () {
+    const registry = ModelRegistry();
 
-    expect(provider, isA<OpenAIProvider>());
-  });
-
-  test('resolve() forwards the given OpenAIEnvironment without throwing, '
-      'regardless of whether organization is present', () {
     expect(
       () => ModelProviderResolver.resolve(
-        useOpenAI: true,
-        environment: _environment,
+        provider: 'unknown',
+        registry: registry,
       ),
-      returnsNormally,
-    );
-    expect(
-      () => ModelProviderResolver.resolve(
-        useOpenAI: true,
-        environment: _environmentWithOrganization,
+      throwsA(
+        isA<ModelException>().having(
+          (e) => e.message,
+          'message',
+          'Unknown model provider: unknown',
+        ),
       ),
-      returnsNormally,
     );
   });
 
-  test('resolve() performs no HTTP request while building the provider', () {
-    expect(
-      () => ModelProviderResolver.resolve(
-        useOpenAI: true,
-        environment: _environment,
-      ),
-      returnsNormally,
+  test('resolve() works with any registered ModelProvider without '
+      'OpenAI-specific logic', () {
+    final registry = ModelRegistry(
+      providers: {
+        'first': _FakeModelProvider(),
+        'second': _FakeModelProvider(),
+      },
     );
+
+    final first = ModelProviderResolver.resolve(
+      provider: 'first',
+      registry: registry,
+    );
+    final second = ModelProviderResolver.resolve(
+      provider: 'second',
+      registry: registry,
+    );
+
+    expect(first, isA<ModelProvider>());
+    expect(second, isA<ModelProvider>());
   });
 }
