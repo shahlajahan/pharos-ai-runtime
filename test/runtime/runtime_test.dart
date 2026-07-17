@@ -180,13 +180,13 @@ class _ConfigurableModelProvider extends ModelProvider {
 class _SpyToolInvoker extends ToolInvoker {
   _SpyToolInvoker() : super(registry: const ToolRegistry());
 
-  final List<String> invokedToolIds = [];
+  final List<ToolCall> invokedToolCalls = [];
 
   @override
-  Future<Result> invoke(String toolId) async {
-    invokedToolIds.add(toolId);
+  Future<Result> invoke(ToolCall toolCall) async {
+    invokedToolCalls.add(toolCall);
 
-    return Result.success('invoked $toolId');
+    return Result.success('invoked ${toolCall.name}');
   }
 }
 
@@ -709,7 +709,7 @@ void main() {
 
       await runtime.run(['marketing'], source: _PlaceholderHQSource());
 
-      expect(toolInvoker.invokedToolIds, isEmpty);
+      expect(toolInvoker.invokedToolCalls, isEmpty);
     },
   );
 
@@ -739,7 +739,7 @@ void main() {
 
     await runtime.run(['marketing'], source: _PlaceholderHQSource());
 
-    expect(toolInvoker.invokedToolIds, ['search']);
+    expect(toolInvoker.invokedToolCalls.map((call) => call.name), ['search']);
   });
 
   test('Runtime executes multiple tool calls sequentially, in order', () async {
@@ -771,8 +771,45 @@ void main() {
 
     await runtime.run(['marketing'], source: _PlaceholderHQSource());
 
-    expect(toolInvoker.invokedToolIds, ['search', 'calculator']);
+    expect(toolInvoker.invokedToolCalls.map((call) => call.name), [
+      'search',
+      'calculator',
+    ]);
   });
+
+  test(
+    'Runtime forwards the original ToolCall unchanged into ToolInvoker',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      const toolCall = ToolCall(
+        id: 'call_1',
+        name: 'search',
+        arguments: '{"query":"Paris"}',
+      );
+      final modelProvider = _ConfigurableModelProvider()
+        ..response = const ModelResponse(text: 'ok', toolCalls: [toolCall]);
+      final toolInvoker = _SpyToolInvoker();
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+        toolInvoker: toolInvoker,
+      );
+
+      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+      expect(toolInvoker.invokedToolCalls, [same(toolCall)]);
+    },
+  );
 
   test('Runtime still returns the response-handler Result when tool calls '
       'exist', () async {

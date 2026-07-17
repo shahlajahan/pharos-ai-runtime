@@ -1,4 +1,5 @@
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 import 'package:pharos_ai_runtime/tooling/tool_context.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 
@@ -7,19 +8,19 @@ class ToolInvoker {
 
   final ToolRegistry _registry;
 
-  Future<Result> invoke(String toolId) async {
-    final tool = _registry.find(toolId);
+  Future<Result> invoke(ToolCall toolCall) async {
+    final tool = _registry.find(toolCall.name);
 
     if (tool == null) {
-      return Result.failure('Tool "$toolId" not found.');
+      return Result.failure('Tool "${toolCall.name}" not found.');
     }
 
-    final context = ToolContext(toolId: toolId);
+    final context = ToolContext(toolId: toolCall.name);
 
     try {
       return await tool.execute(context);
     } catch (e) {
-      return Result.failure('Tool "$toolId" failed: $e');
+      return Result.failure('Tool "${toolCall.name}" failed: $e');
     }
   }
 }
