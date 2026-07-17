@@ -8,6 +8,7 @@ import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
 import 'package:pharos_ai_runtime/network/http_transport_response.dart';
 import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
+import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:test/test.dart';
 
 class _FakeHttpTransport extends HttpTransport {
@@ -736,5 +737,145 @@ void main() {
 
     expect(result.text, '');
     expect(result.toolCalls, hasLength(1));
+  });
+
+  test('complete() produces an identical messages payload when '
+      'request.toolOutputs is empty', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    await client.complete(request, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    final messages = decoded['messages'] as List<dynamic>;
+
+    expect(messages, hasLength(2));
+    expect((messages[0] as Map<String, dynamic>)['role'], 'system');
+    expect((messages[1] as Map<String, dynamic>)['role'], 'user');
+  });
+
+  test('complete() serializes a single ToolOutput as a tool message', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithToolOutputs = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+      toolOutputs: [
+        ToolOutput(
+          toolCallId: 'call_1',
+          toolName: 'search',
+          success: true,
+          content: 'Paris is the capital of France.',
+        ),
+      ],
+    );
+
+    await client.complete(requestWithToolOutputs, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    final messages = decoded['messages'] as List<dynamic>;
+
+    expect(messages, hasLength(3));
+    expect(messages[2], {
+      'role': 'tool',
+      'tool_call_id': 'call_1',
+      'content': 'Paris is the capital of France.',
+    });
+  });
+
+  test('complete() serializes multiple ToolOutputs as tool messages, '
+      'preserving order', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithToolOutputs = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+      toolOutputs: [
+        ToolOutput(
+          toolCallId: 'call_1',
+          toolName: 'search',
+          success: true,
+          content: 'first output',
+        ),
+        ToolOutput(
+          toolCallId: 'call_2',
+          toolName: 'calculator',
+          success: false,
+          content: 'second output',
+        ),
+      ],
+    );
+
+    await client.complete(requestWithToolOutputs, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    final messages = decoded['messages'] as List<dynamic>;
+
+    expect(messages, hasLength(4));
+    expect(messages[2], {
+      'role': 'tool',
+      'tool_call_id': 'call_1',
+      'content': 'first output',
+    });
+    expect(messages[3], {
+      'role': 'tool',
+      'tool_call_id': 'call_2',
+      'content': 'second output',
+    });
+  });
+
+  test('complete() does not touch the system message, user message, or '
+      'tool definitions when toolOutputs are present', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+    const requestWithBoth = ModelRequest(
+      systemPrompt: 'You are a helpful assistant.',
+      userPrompt: 'What is the capital of France?',
+      tools: [ToolDefinition(id: 'search', description: 'Search the web.')],
+      toolOutputs: [
+        ToolOutput(
+          toolCallId: 'call_1',
+          toolName: 'search',
+          success: true,
+          content: 'Paris.',
+        ),
+      ],
+    );
+
+    await client.complete(requestWithBoth, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    final messages = decoded['messages'] as List<dynamic>;
+
+    expect(
+      (messages[0] as Map<String, dynamic>)['content'],
+      'You are a helpful assistant.',
+    );
+    expect(
+      (messages[1] as Map<String, dynamic>)['content'],
+      'What is the capital of France?',
+    );
+    expect(decoded['tools'], [
+      {
+        'type': 'function',
+        'function': {'name': 'search', 'description': 'Search the web.'},
+      },
+    ]);
   });
 }

@@ -35,6 +35,13 @@ class HttpOpenAIClient extends OpenAIClient {
       'messages': [
         {'role': 'system', 'content': request.systemPrompt},
         {'role': 'user', 'content': request.userPrompt},
+        ...request.toolOutputs.map(
+          (toolOutput) => {
+            'role': 'tool',
+            'tool_call_id': toolOutput.toolCallId,
+            'content': toolOutput.content,
+          },
+        ),
       ],
       if (request.tools.isNotEmpty)
         'tools': request.tools
