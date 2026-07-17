@@ -566,4 +566,104 @@ void main() {
       'What is the capital of France?',
     );
   });
+
+  test('complete() returns an empty toolCalls list when tool_calls is '
+      'absent', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final result = await client.complete(request, modelConfig, openAiConfig);
+
+    expect(result.toolCalls, isEmpty);
+  });
+
+  test('complete() returns an empty toolCalls list when tool_calls is an '
+      'empty array', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"choices": [{"message": {"content": "Paris.", '
+          '"tool_calls": []}}]}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final result = await client.complete(request, modelConfig, openAiConfig);
+
+    expect(result.toolCalls, isEmpty);
+  });
+
+  test('complete() parses a single tool call correctly', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"choices": [{"message": {"content": "", "tool_calls": ['
+          '{"id": "call_123", "type": "function", "function": '
+          '{"name": "search", "arguments": "{\\"query\\":\\"Paris\\"}"}}'
+          ']}}]}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final result = await client.complete(request, modelConfig, openAiConfig);
+
+    expect(result.toolCalls, hasLength(1));
+    expect(result.toolCalls.first.id, 'call_123');
+    expect(result.toolCalls.first.name, 'search');
+    expect(result.toolCalls.first.arguments, '{"query":"Paris"}');
+  });
+
+  test(
+    'complete() parses multiple tool calls correctly, preserving order',
+    () async {
+      final transport = _FakeHttpTransport()
+        ..responseBody =
+            '{"choices": [{"message": {"content": "", "tool_calls": ['
+            '{"id": "call_1", "type": "function", "function": '
+            '{"name": "search", "arguments": "{}"}},'
+            '{"id": "call_2", "type": "function", "function": '
+            '{"name": "calculator", "arguments": "{}"}}'
+            ']}}]}';
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+      );
+
+      final result = await client.complete(request, modelConfig, openAiConfig);
+
+      expect(result.toolCalls, hasLength(2));
+      expect(result.toolCalls[0].id, 'call_1');
+      expect(result.toolCalls[0].name, 'search');
+      expect(result.toolCalls[1].id, 'call_2');
+      expect(result.toolCalls[1].name, 'calculator');
+    },
+  );
+
+  test(
+    'complete() preserves assistant text when tool calls are present',
+    () async {
+      final transport = _FakeHttpTransport()
+        ..responseBody =
+            '{"choices": [{"message": {"content": "Here is the answer.", '
+            '"tool_calls": [{"id": "call_1", "type": "function", '
+            '"function": {"name": "search", "arguments": "{}"}}]}}]}';
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+      );
+
+      final result = await client.complete(request, modelConfig, openAiConfig);
+
+      expect(result.text, 'Here is the answer.');
+      expect(result.toolCalls, hasLength(1));
+    },
+  );
 }

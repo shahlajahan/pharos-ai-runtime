@@ -7,6 +7,7 @@ import 'package:pharos_ai_runtime/models/openai_config.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/models/openai_result.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
+import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 
 class HttpOpenAIClient extends OpenAIClient {
   HttpOpenAIClient({required HttpTransport transport}) : _transport = transport;
@@ -81,6 +82,21 @@ class HttpOpenAIClient extends OpenAIClient {
         (choices[0] as Map<String, dynamic>)['message'] as Map<String, dynamic>;
     final text = message['content'] as String;
 
-    return OpenAIResult(text: text);
+    final rawToolCalls = message['tool_calls'] as List<dynamic>?;
+
+    final toolCalls = rawToolCalls == null
+        ? const <ToolCall>[]
+        : rawToolCalls.map((entry) {
+            final toolCall = entry as Map<String, dynamic>;
+            final function = toolCall['function'] as Map<String, dynamic>;
+
+            return ToolCall(
+              id: toolCall['id'] as String,
+              name: function['name'] as String,
+              arguments: function['arguments'] as String,
+            );
+          }).toList();
+
+    return OpenAIResult(text: text, toolCalls: toolCalls);
   }
 }

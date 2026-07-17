@@ -4,6 +4,7 @@ import 'package:pharos_ai_runtime/models/openai_client.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
 import 'package:pharos_ai_runtime/models/openai_provider.dart';
 import 'package:pharos_ai_runtime/models/openai_result.dart';
+import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:test/test.dart';
 
@@ -11,6 +12,9 @@ class _FakeOpenAIClient extends OpenAIClient {
   ModelRequest? capturedRequest;
   ModelConfig? capturedModelConfig;
   OpenAIConfig? capturedOpenAiConfig;
+  OpenAIResult result = const OpenAIResult(
+    text: 'Paris is the capital of France.',
+  );
 
   @override
   Future<OpenAIResult> complete(
@@ -22,7 +26,7 @@ class _FakeOpenAIClient extends OpenAIClient {
     capturedModelConfig = modelConfig;
     capturedOpenAiConfig = openAiConfig;
 
-    return const OpenAIResult(text: 'Paris is the capital of France.');
+    return result;
   }
 }
 
@@ -107,4 +111,40 @@ void main() {
     expect(client.capturedRequest, same(requestWithTools));
     expect(client.capturedRequest!.tools, requestWithTools.tools);
   });
+
+  test('generate() forwards OpenAIResult.toolCalls unchanged', () async {
+    const toolCalls = [
+      ToolCall(id: 'call_1', name: 'search', arguments: '{"query":"Paris"}'),
+    ];
+    final client = _FakeOpenAIClient()
+      ..result = const OpenAIResult(
+        text: 'Paris is the capital of France.',
+        toolCalls: toolCalls,
+      );
+    final provider = OpenAIProvider(
+      client: client,
+      modelConfig: modelConfig,
+      openAiConfig: openAiConfig,
+    );
+
+    final response = await provider.generate(request);
+
+    expect(response.toolCalls, same(toolCalls));
+  });
+
+  test(
+    'generate() returns an empty toolCalls list when none are present',
+    () async {
+      final client = _FakeOpenAIClient();
+      final provider = OpenAIProvider(
+        client: client,
+        modelConfig: modelConfig,
+        openAiConfig: openAiConfig,
+      );
+
+      final response = await provider.generate(request);
+
+      expect(response.toolCalls, isEmpty);
+    },
+  );
 }

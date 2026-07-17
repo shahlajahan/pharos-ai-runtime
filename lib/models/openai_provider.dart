@@ -20,12 +20,8 @@ class OpenAIProvider extends ModelProvider {
 
   @override
   Future<ModelResponse> generate(ModelRequest request) async {
-    final result = await _client.complete(
-      request,
-      _modelConfig,
-      _openAiConfig,
-    );
+    final result = await _client.complete(request, _modelConfig, _openAiConfig);
 
-    return ModelResponse(text: result.text);
+    return ModelResponse(text: result.text, toolCalls: result.toolCalls);
   }
 }
