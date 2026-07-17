@@ -80,7 +80,8 @@ class HttpOpenAIClient extends OpenAIClient {
     final choices = decoded['choices'] as List<dynamic>;
     final message =
         (choices[0] as Map<String, dynamic>)['message'] as Map<String, dynamic>;
-    final text = message['content'] as String;
+    final rawContent = message['content'];
+    final text = rawContent == null ? '' : rawContent as String;
 
     final rawToolCalls = message['tool_calls'] as List<dynamic>?;
 

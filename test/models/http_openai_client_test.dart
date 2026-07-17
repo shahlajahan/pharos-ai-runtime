@@ -666,4 +666,75 @@ void main() {
       expect(result.toolCalls, hasLength(1));
     },
   );
+
+  test('complete() returns an empty text when content is null and a tool '
+      'call is present', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"choices": [{"message": {"content": null, "tool_calls": '
+          '[{"id": "call_1", "type": "function", "function": '
+          '{"name": "search", "arguments": "{}"}}]}}]}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final result = await client.complete(request, modelConfig, openAiConfig);
+
+    expect(result.text, '');
+  });
+
+  test('complete() still parses the tool call when content is null', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"choices": [{"message": {"content": null, "tool_calls": '
+          '[{"id": "call_1", "type": "function", "function": '
+          '{"name": "search", "arguments": "{\\"query\\":\\"Paris\\"}"}}]}}]}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final result = await client.complete(request, modelConfig, openAiConfig);
+
+    expect(result.toolCalls, hasLength(1));
+    expect(result.toolCalls.first.id, 'call_1');
+    expect(result.toolCalls.first.name, 'search');
+    expect(result.toolCalls.first.arguments, '{"query":"Paris"}');
+  });
+
+  test('complete() leaves normal string content unchanged', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody = '{"choices": [{"message": {"content": "Paris."}}]}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final result = await client.complete(request, modelConfig, openAiConfig);
+
+    expect(result.text, 'Paris.');
+  });
+
+  test('complete() returns an empty text when content is missing entirely '
+      'but a tool call is present', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          '{"choices": [{"message": {"tool_calls": '
+          '[{"id": "call_1", "type": "function", "function": '
+          '{"name": "search", "arguments": "{}"}}]}}]}';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final result = await client.complete(request, modelConfig, openAiConfig);
+
+    expect(result.text, '');
+    expect(result.toolCalls, hasLength(1));
+  });
 }
