@@ -7,6 +7,7 @@ import 'package:pharos_ai_runtime/models/openai_client.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/models/openai_result.dart';
+import 'package:pharos_ai_runtime/models/streaming_response.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
 import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 
@@ -30,51 +31,10 @@ class HttpOpenAIClient extends OpenAIClient {
         'OpenAI-Organization': openAiConfig.organization!,
     };
 
-    final conversationMessages = <Map<String, dynamic>>[];
-
-    for (final message in request.conversation.messages) {
-      if (message is SystemMessage) {
-        conversationMessages.add({
-          'role': 'system',
-          'content': message.content,
-        });
-      } else if (message is UserMessage) {
-        conversationMessages.add({'role': 'user', 'content': message.content});
-      } else if (message is AssistantMessage) {
-        final assistantMessage = <String, dynamic>{
-          'role': 'assistant',
-          'content': message.content,
-        };
-
-        if (message.toolCalls.isNotEmpty) {
-          assistantMessage['tool_calls'] = message.toolCalls
-              .map(
-                (toolCall) => {
-                  'id': toolCall.id,
-                  'type': 'function',
-                  'function': {
-                    'name': toolCall.name,
-                    'arguments': toolCall.arguments,
-                  },
-                },
-              )
-              .toList();
-        }
-
-        conversationMessages.add(assistantMessage);
-      } else if (message is ToolMessage) {
-        conversationMessages.add({
-          'role': 'tool',
-          'tool_call_id': message.toolCallId,
-          'content': message.content,
-        });
-      }
-    }
-
     final body = jsonEncode({
       'model': modelConfig.model,
       'temperature': modelConfig.temperature,
-      'messages': conversationMessages,
+      'messages': _serializeConversation(request.conversation),
       if (request.tools.isNotEmpty)
         'tools': request.tools
             .map(
@@ -139,4 +99,140 @@ class HttpOpenAIClient extends OpenAIClient {
 
     return OpenAIResult(text: text, toolCalls: toolCalls);
   }
+
+  Future<StreamingResponse> stream(
+    ModelRequest request,
+    ModelConfig modelConfig,
+    OpenAIConfig openAiConfig,
+  ) async {
+    final uri = Uri.parse(openAiConfig.baseUrl);
+
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${openAiConfig.apiKey}',
+      if (openAiConfig.organization != null)
+        'OpenAI-Organization': openAiConfig.organization!,
+    };
+
+    final body = jsonEncode({
+      'model': modelConfig.model,
+      'temperature': modelConfig.temperature,
+      'stream': true,
+      'messages': _serializeConversation(request.conversation),
+      if (request.tools.isNotEmpty)
+        'tools': request.tools
+            .map(
+              (tool) => {
+                'type': 'function',
+                'function': {'name': tool.id, 'description': tool.description},
+              },
+            )
+            .toList(),
+    });
+
+    final response = await _transport.post(
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    return _OpenAIStreamingResponse(_parseSse(response.body));
+  }
+
+  List<Map<String, dynamic>> _serializeConversation(Conversation conversation) {
+    final conversationMessages = <Map<String, dynamic>>[];
+
+    for (final message in conversation.messages) {
+      if (message is SystemMessage) {
+        conversationMessages.add({
+          'role': 'system',
+          'content': message.content,
+        });
+      } else if (message is UserMessage) {
+        conversationMessages.add({'role': 'user', 'content': message.content});
+      } else if (message is AssistantMessage) {
+        final assistantMessage = <String, dynamic>{
+          'role': 'assistant',
+          'content': message.content,
+        };
+
+        if (message.toolCalls.isNotEmpty) {
+          assistantMessage['tool_calls'] = message.toolCalls
+              .map(
+                (toolCall) => {
+                  'id': toolCall.id,
+                  'type': 'function',
+                  'function': {
+                    'name': toolCall.name,
+                    'arguments': toolCall.arguments,
+                  },
+                },
+              )
+              .toList();
+        }
+
+        conversationMessages.add(assistantMessage);
+      } else if (message is ToolMessage) {
+        conversationMessages.add({
+          'role': 'tool',
+          'tool_call_id': message.toolCallId,
+          'content': message.content,
+        });
+      }
+    }
+
+    return conversationMessages;
+  }
+
+  Stream<ModelResponseChunk> _parseSse(String body) async* {
+    for (final rawLine in const LineSplitter().convert(body)) {
+      final line = rawLine.trim();
+
+      if (!line.startsWith('data:')) {
+        continue;
+      }
+
+      final payload = line.substring('data:'.length).trim();
+
+      if (payload == '[DONE]') {
+        yield const ModelResponseChunk(isFinished: true);
+        return;
+      }
+
+      final decoded = jsonDecode(payload) as Map<String, dynamic>;
+      final choices = decoded['choices'] as List<dynamic>;
+      final delta =
+          (choices[0] as Map<String, dynamic>)['delta'] as Map<String, dynamic>;
+
+      final content = delta['content'];
+      final rawToolCalls = delta['tool_calls'];
+
+      if (content == null && rawToolCalls == null) {
+        continue;
+      }
+
+      yield ModelResponseChunk(
+        textDelta: content as String?,
+        toolCalls: rawToolCalls == null
+            ? null
+            : (rawToolCalls as List<dynamic>).map((entry) {
+                final toolCall = entry as Map<String, dynamic>;
+                final function = toolCall['function'] as Map<String, dynamic>?;
+
+                return ToolCall(
+                  id: toolCall['id'] as String? ?? '',
+                  name: function?['name'] as String? ?? '',
+                  arguments: function?['arguments'] as String? ?? '',
+                );
+              }).toList(),
+      );
+    }
+  }
+}
+
+class _OpenAIStreamingResponse implements StreamingResponse {
+  const _OpenAIStreamingResponse(this.stream);
+
+  @override
+  final Stream<ModelResponseChunk> stream;
 }

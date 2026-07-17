@@ -6,6 +6,7 @@ import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/openai_config.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
+import 'package:pharos_ai_runtime/models/streaming_response.dart';
 import 'package:pharos_ai_runtime/network/http_transport.dart';
 import 'package:pharos_ai_runtime/network/http_transport_response.dart';
 import 'package:pharos_ai_runtime/tooling/tool_call.dart';
@@ -1154,4 +1155,175 @@ void main() {
       );
     },
   );
+
+  test('stream() sends "stream": true in the request body', () async {
+    final transport = _FakeHttpTransport()..responseBody = 'data: [DONE]\n\n';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    await client.stream(request, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    expect(decoded['stream'], isTrue);
+  });
+
+  test('stream() returns a StreamingResponse', () async {
+    final transport = _FakeHttpTransport()..responseBody = 'data: [DONE]\n\n';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final streamingResponse = await client.stream(
+      request,
+      modelConfig,
+      openAiConfig,
+    );
+
+    expect(streamingResponse, isA<StreamingResponse>());
+  });
+
+  test('stream() emits a ModelResponseChunk with textDelta for a delta.content '
+      'event', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n'
+          'data: [DONE]\n\n';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final streamingResponse = await client.stream(
+      request,
+      modelConfig,
+      openAiConfig,
+    );
+    final chunks = await streamingResponse.stream.toList();
+
+    expect(chunks[0].textDelta, 'Hello');
+    expect(chunks[0].toolCalls, isNull);
+    expect(chunks[0].isFinished, isFalse);
+  });
+
+  test('stream() emits multiple text chunks in order', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n'
+          'data: {"choices":[{"delta":{"content":" world"}}]}\n\n'
+          'data: [DONE]\n\n';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final streamingResponse = await client.stream(
+      request,
+      modelConfig,
+      openAiConfig,
+    );
+    final chunks = await streamingResponse.stream.toList();
+
+    expect(chunks, hasLength(3));
+    expect(chunks[0].textDelta, 'Hello');
+    expect(chunks[1].textDelta, ' world');
+    expect(chunks[2].isFinished, isTrue);
+  });
+
+  test('stream() emits a ModelResponseChunk with toolCalls for a '
+      'delta.tool_calls event', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          'data: {"choices":[{"delta":{"tool_calls":'
+          '[{"id":"call_1","function":{"name":"search",'
+          '"arguments":"{}"}}]}}]}\n\n'
+          'data: [DONE]\n\n';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final streamingResponse = await client.stream(
+      request,
+      modelConfig,
+      openAiConfig,
+    );
+    final chunks = await streamingResponse.stream.toList();
+
+    expect(chunks[0].textDelta, isNull);
+    expect(chunks[0].toolCalls, hasLength(1));
+    expect(chunks[0].toolCalls![0].id, 'call_1');
+    expect(chunks[0].toolCalls![0].name, 'search');
+    expect(chunks[0].toolCalls![0].arguments, '{}');
+  });
+
+  test('stream() emits ModelResponseChunk(isFinished: true) for the [DONE] '
+      'event, and then closes the stream', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n'
+          'data: [DONE]\n\n';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final streamingResponse = await client.stream(
+      request,
+      modelConfig,
+      openAiConfig,
+    );
+    final chunks = await streamingResponse.stream.toList();
+
+    expect(chunks, hasLength(2));
+    expect(chunks.last.isFinished, isTrue);
+    expect(chunks.last.textDelta, isNull);
+  });
+
+  test('stream() ignores finish_reason, usage, and logprobs, emitting no chunk '
+      'for a delta with neither content nor tool_calls', () async {
+    final transport = _FakeHttpTransport()
+      ..responseBody =
+          'data: {"choices":[{"delta":{},"finish_reason":"stop",'
+          '"logprobs":null}],"usage":{"total_tokens":10}}\n\n'
+          'data: [DONE]\n\n';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    final streamingResponse = await client.stream(
+      request,
+      modelConfig,
+      openAiConfig,
+    );
+    final chunks = await streamingResponse.stream.toList();
+
+    expect(chunks, hasLength(1));
+    expect(chunks.single.isFinished, isTrue);
+  });
+
+  test('complete() remains unaffected by the stream=true request format '
+      'used by stream()', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+    );
+
+    await client.complete(request, modelConfig, openAiConfig);
+
+    final decoded = jsonDecode(transport.capturedBody!) as Map<String, dynamic>;
+    expect(decoded.containsKey('stream'), isFalse);
+  });
 }
