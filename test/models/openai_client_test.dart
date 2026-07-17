@@ -1,3 +1,4 @@
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/openai_client.dart';
@@ -28,8 +29,12 @@ void main() {
   test('complete() returns an OpenAIResult', () async {
     final client = _FakeOpenAIClient();
     const request = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
     );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     const openAiConfig = OpenAIConfig(
@@ -45,8 +50,12 @@ void main() {
   test('complete() passes the request through unchanged', () async {
     final client = _FakeOpenAIClient();
     const request = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
     );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     const openAiConfig = OpenAIConfig(
@@ -62,8 +71,12 @@ void main() {
   test('complete() passes the modelConfig through unchanged', () async {
     final client = _FakeOpenAIClient();
     const request = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
     );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     const openAiConfig = OpenAIConfig(
@@ -79,8 +92,12 @@ void main() {
   test('complete() passes the openAiConfig through unchanged', () async {
     final client = _FakeOpenAIClient();
     const request = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
     );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     const openAiConfig = OpenAIConfig(

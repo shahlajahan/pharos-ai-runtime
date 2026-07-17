@@ -1,3 +1,4 @@
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/openai_client.dart';
@@ -32,8 +33,12 @@ class _FakeOpenAIClient extends OpenAIClient {
 
 void main() {
   const request = ModelRequest(
-    systemPrompt: 'You are a helpful assistant.',
-    userPrompt: 'What is the capital of France?',
+    conversation: Conversation(
+      messages: [
+        SystemMessage(content: 'You are a helpful assistant.'),
+        UserMessage(content: 'What is the capital of France?'),
+      ],
+    ),
   );
   const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
   const openAiConfig = OpenAIConfig(
@@ -101,8 +106,12 @@ void main() {
       openAiConfig: openAiConfig,
     );
     const requestWithTools = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
       tools: [ToolDefinition(id: 'search', description: 'Search the web.')],
     );
 

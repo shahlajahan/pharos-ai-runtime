@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/openai_client.dart';
@@ -29,12 +30,24 @@ class HttpOpenAIClient extends OpenAIClient {
         'OpenAI-Organization': openAiConfig.organization!,
     };
 
+    final conversationMessages = <Map<String, String>>[];
+
+    for (final message in request.conversation.messages) {
+      if (message is SystemMessage) {
+        conversationMessages.add({
+          'role': 'system',
+          'content': message.content,
+        });
+      } else if (message is UserMessage) {
+        conversationMessages.add({'role': 'user', 'content': message.content});
+      }
+    }
+
     final body = jsonEncode({
       'model': modelConfig.model,
       'temperature': modelConfig.temperature,
       'messages': [
-        {'role': 'system', 'content': request.systemPrompt},
-        {'role': 'user', 'content': request.userPrompt},
+        ...conversationMessages,
         ...request.toolOutputs.map(
           (toolOutput) => {
             'role': 'tool',

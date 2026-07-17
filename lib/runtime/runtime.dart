@@ -5,6 +5,7 @@ import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
@@ -130,6 +131,13 @@ class Runtime {
   }
 
   ModelRequest _buildModelRequest() {
-    return const ModelRequest(systemPrompt: '', userPrompt: '');
+    return const ModelRequest(
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: ''),
+          UserMessage(content: ''),
+        ],
+      ),
+    );
   }
 }

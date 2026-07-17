@@ -1,4 +1,5 @@
 import 'package:pharos_ai_runtime/employees/employee_definition.dart';
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
@@ -17,7 +18,7 @@ class _FakeRuntimeRequestBuilder extends RuntimeRequestBuilder {
   }) {
     capturedEmployee = employee;
 
-    return const ModelRequest(systemPrompt: '', userPrompt: '');
+    return const ModelRequest(conversation: Conversation());
   }
 }
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/http_openai_client.dart';
 import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
@@ -55,8 +56,12 @@ void main() {
       openAiConfig: openAiConfig,
     );
     const request = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
     );
 
     final response = await provider.generate(request);

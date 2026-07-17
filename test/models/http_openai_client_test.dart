@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/http_openai_client.dart';
 import 'package:pharos_ai_runtime/models/model_config.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
@@ -38,8 +39,12 @@ class _FakeHttpTransport extends HttpTransport {
 
 void main() {
   const request = ModelRequest(
-    systemPrompt: 'You are a helpful assistant.',
-    userPrompt: 'What is the capital of France?',
+    conversation: Conversation(
+      messages: [
+        SystemMessage(content: 'You are a helpful assistant.'),
+        UserMessage(content: 'What is the capital of France?'),
+      ],
+    ),
   );
   const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
 
@@ -486,8 +491,12 @@ void main() {
       baseUrl: 'https://api.openai.com/v1/chat/completions',
     );
     const requestWithTools = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
       tools: [ToolDefinition(id: 'search', description: 'Search the web.')],
     );
 
@@ -512,8 +521,12 @@ void main() {
         baseUrl: 'https://api.openai.com/v1/chat/completions',
       );
       const requestWithTools = ModelRequest(
-        systemPrompt: 'You are a helpful assistant.',
-        userPrompt: 'What is the capital of France?',
+        conversation: Conversation(
+          messages: [
+            SystemMessage(content: 'You are a helpful assistant.'),
+            UserMessage(content: 'What is the capital of France?'),
+          ],
+        ),
         tools: [
           ToolDefinition(id: 'search', description: 'Search the web.'),
           ToolDefinition(id: 'calculator', description: 'Evaluate math.'),
@@ -546,8 +559,12 @@ void main() {
       baseUrl: 'https://api.openai.com/v1/chat/completions',
     );
     const requestWithTools = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
       tools: [ToolDefinition(id: 'search', description: 'Search the web.')],
     );
 
@@ -766,8 +783,12 @@ void main() {
       baseUrl: 'https://api.openai.com/v1/chat/completions',
     );
     const requestWithToolOutputs = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
       toolOutputs: [
         ToolOutput(
           toolCallId: 'call_1',
@@ -800,8 +821,12 @@ void main() {
       baseUrl: 'https://api.openai.com/v1/chat/completions',
     );
     const requestWithToolOutputs = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
       toolOutputs: [
         ToolOutput(
           toolCallId: 'call_1',
@@ -845,8 +870,12 @@ void main() {
       baseUrl: 'https://api.openai.com/v1/chat/completions',
     );
     const requestWithBoth = ModelRequest(
-      systemPrompt: 'You are a helpful assistant.',
-      userPrompt: 'What is the capital of France?',
+      conversation: Conversation(
+        messages: [
+          SystemMessage(content: 'You are a helpful assistant.'),
+          UserMessage(content: 'What is the capital of France?'),
+        ],
+      ),
       tools: [ToolDefinition(id: 'search', description: 'Search the web.')],
       toolOutputs: [
         ToolOutput(

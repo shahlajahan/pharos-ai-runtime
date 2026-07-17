@@ -1,3 +1,4 @@
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
@@ -5,8 +6,12 @@ import 'package:test/test.dart';
 
 void main() {
   const request = ModelRequest(
-    systemPrompt: 'You are a helpful assistant.',
-    userPrompt: 'What is the capital of France?',
+    conversation: Conversation(
+      messages: [
+        SystemMessage(content: 'You are a helpful assistant.'),
+        UserMessage(content: 'What is the capital of France?'),
+      ],
+    ),
   );
 
   test('generate() returns a ModelResponse', () async {
@@ -27,8 +32,12 @@ void main() {
     final first = await provider.generate(request);
     final second = await provider.generate(
       const ModelRequest(
-        systemPrompt: 'A completely different prompt.',
-        userPrompt: 'A completely different question.',
+        conversation: Conversation(
+          messages: [
+            SystemMessage(content: 'A completely different prompt.'),
+            UserMessage(content: 'A completely different question.'),
+          ],
+        ),
       ),
     );
 

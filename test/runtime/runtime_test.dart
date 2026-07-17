@@ -5,6 +5,7 @@ import 'package:pharos_ai_runtime/employees/employee_definition.dart';
 import 'package:pharos_ai_runtime/hq/hq_boot_result.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
@@ -91,7 +92,7 @@ class _SpyRuntimeRequestBuilder extends RuntimeRequestBuilder {
     capturedTools = tools;
     capturedToolOutputs = toolOutputs;
 
-    return const ModelRequest(systemPrompt: '', userPrompt: '');
+    return const ModelRequest(conversation: Conversation());
   }
 }
 

@@ -1,3 +1,4 @@
+import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
@@ -16,8 +17,12 @@ void main() {
     () async {
       final provider = _FakeModelProvider();
       const request = ModelRequest(
-        systemPrompt: 'You are a helpful assistant.',
-        userPrompt: 'What is the capital of France?',
+        conversation: Conversation(
+          messages: [
+            SystemMessage(content: 'You are a helpful assistant.'),
+            UserMessage(content: 'What is the capital of France?'),
+          ],
+        ),
       );
 
       final response = await provider.generate(request);
