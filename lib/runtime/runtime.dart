@@ -95,6 +95,7 @@ class Runtime {
         }
 
         final toolOutputs = <ToolOutput>[];
+        final toolMessages = <ToolMessage>[];
 
         for (final toolCall in response.toolCalls) {
           final result = await _toolInvoker.invoke(toolCall);
@@ -107,10 +108,29 @@ class Runtime {
               content: result.message,
             ),
           );
+
+          toolMessages.add(
+            ToolMessage(
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              content: result.message,
+            ),
+          );
         }
 
-        final secondRequest = _requestBuilder.build(
-          selectedEmployee,
+        final updatedConversation = Conversation(
+          messages: [
+            ...request.conversation.messages,
+            AssistantMessage(
+              content: response.text,
+              toolCalls: response.toolCalls,
+            ),
+            ...toolMessages,
+          ],
+        );
+
+        final secondRequest = ModelRequest(
+          conversation: updatedConversation,
           tools: _toolRegistry.definitions(),
           toolOutputs: toolOutputs,
         );

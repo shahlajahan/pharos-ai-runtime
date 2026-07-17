@@ -1077,6 +1077,137 @@ void main() {
     expect(responseHandler.capturedResponse, same(secondResponse));
   });
 
+  test('Runtime appends an AssistantMessage with the response content and '
+      'toolCalls after tool execution', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _TwoStepModelProvider()
+      ..firstResponse = const ModelResponse(
+        text: 'let me check',
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+      )
+      ..secondResponse = const ModelResponse(text: 'final answer');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    final firstRequest = modelProvider.capturedRequests[0];
+    final secondRequest = modelProvider.capturedRequests[1];
+    final firstLength = firstRequest.conversation.messages.length;
+
+    final assistantMessage =
+        secondRequest.conversation.messages[firstLength] as AssistantMessage;
+
+    expect(assistantMessage.content, 'let me check');
+    expect(
+      assistantMessage.toolCalls,
+      same(modelProvider.firstResponse.toolCalls),
+    );
+  });
+
+  test('Runtime appends a ToolMessage per executed tool call, after the '
+      'AssistantMessage and in ToolCall order', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const toolCall1 = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
+    const toolCall2 = ToolCall(
+      id: 'call_2',
+      name: 'calculator',
+      arguments: '{}',
+    );
+    final modelProvider = _TwoStepModelProvider()
+      ..firstResponse = const ModelResponse(
+        text: '',
+        toolCalls: [toolCall1, toolCall2],
+      )
+      ..secondResponse = const ModelResponse(text: 'final answer');
+    final toolInvoker = _SpyToolInvoker();
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+      toolInvoker: toolInvoker,
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    final secondRequest = modelProvider.capturedRequests[1];
+    final firstLength =
+        modelProvider.capturedRequests[0].conversation.messages.length;
+    final messagesAfterAssistant = secondRequest.conversation.messages.sublist(
+      firstLength + 1,
+    );
+
+    expect(messagesAfterAssistant, hasLength(2));
+
+    final toolMessage1 = messagesAfterAssistant[0] as ToolMessage;
+    final toolMessage2 = messagesAfterAssistant[1] as ToolMessage;
+
+    expect(toolMessage1.toolCallId, 'call_1');
+    expect(toolMessage1.toolName, 'search');
+    expect(toolMessage1.content, 'invoked search');
+    expect(toolMessage2.toolCallId, 'call_2');
+    expect(toolMessage2.toolName, 'calculator');
+    expect(toolMessage2.content, 'invoked calculator');
+  });
+
+  test('Runtime creates the second ModelRequest from the updated Conversation, '
+      'preserving the original conversation prefix unchanged', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    final modelProvider = _TwoStepModelProvider()
+      ..firstResponse = const ModelResponse(
+        text: '',
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+      )
+      ..secondResponse = const ModelResponse(text: 'final answer');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+
+    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+
+    final firstRequest = modelProvider.capturedRequests[0];
+    final secondRequest = modelProvider.capturedRequests[1];
+    final firstLength = firstRequest.conversation.messages.length;
+
+    expect(
+      secondRequest.conversation.messages.sublist(0, firstLength),
+      orderedEquals(firstRequest.conversation.messages),
+    );
+    expect(secondRequest.conversation.messages.length, firstLength + 2);
+  });
+
   test('Runtime makes no second request when no tool calls exist', () async {
     const employee = EmployeeRuntime(
       definition: EmployeeDefinition(
