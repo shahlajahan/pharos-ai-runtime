@@ -11,6 +11,7 @@ import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
+import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 
 class Runtime {
   Runtime({
@@ -21,12 +22,14 @@ class Runtime {
     AgentRegistry? registry,
     Logger logger = const Logger(),
     HQBootstrapper? bootstrap,
+    ToolRegistry? toolRegistry,
   }) : _requestBuilder = requestBuilder,
        _responseHandler = responseHandler,
        _registry = registry ?? AgentRegistry(),
        _logger = logger,
        _pipeline = ExecutionPipeline(config: config, logger: logger),
-       _bootstrap = bootstrap;
+       _bootstrap = bootstrap,
+       _toolRegistry = toolRegistry ?? const ToolRegistry();
 
   final ModelProvider modelProvider;
   final RuntimeRequestBuilder _requestBuilder;
@@ -35,6 +38,8 @@ class Runtime {
   final Logger _logger;
   final ExecutionPipeline _pipeline;
   final HQBootstrapper? _bootstrap;
+  // ignore: unused_field
+  final ToolRegistry _toolRegistry;
 
   Future<Result?> run(List<String> args, {HQSource? source}) async {
     if (args.isEmpty) {

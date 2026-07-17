@@ -11,6 +11,7 @@ import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
+import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
 
 class _PlaceholderHQSource extends HQSource {
@@ -119,4 +120,23 @@ void main() {
       expect(result!.success, isTrue);
     },
   );
+
+  test('Runtime accepts a custom ToolRegistry on the HQ path without '
+      'changing behavior', () async {
+    final agent = _SpyAgent();
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      registry: _SpyAgentRegistry(agent),
+      bootstrap: _SucceedingBootstrap(),
+      toolRegistry: const ToolRegistry(),
+    );
+
+    final result = await runtime.run(['spy'], source: _PlaceholderHQSource());
+
+    expect(agent.executed, isFalse);
+    expect(result, isNotNull);
+    expect(result!.success, isTrue);
+  });
 }

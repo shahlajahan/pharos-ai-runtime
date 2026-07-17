@@ -18,6 +18,9 @@ import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
+import 'package:pharos_ai_runtime/tooling/tool.dart';
+import 'package:pharos_ai_runtime/tooling/tool_context.dart';
+import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
 
 class _PlaceholderHQSource extends HQSource {
@@ -146,6 +149,16 @@ class _FormatExceptionModelProvider extends ModelProvider {
   @override
   Future<ModelResponse> generate(ModelRequest request) async {
     throw const FormatException('bad format');
+  }
+}
+
+class _NoopTool extends Tool {
+  @override
+  String get id => 'noop';
+
+  @override
+  Future<Result> execute(ToolContext context) async {
+    return Result.success('noop');
   }
 }
 
@@ -559,4 +572,32 @@ void main() {
       );
     },
   );
+
+  test(
+    'Runtime accepts a custom ToolRegistry without changing behavior',
+    () async {
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        toolRegistry: ToolRegistry(tools: {'noop': _NoopTool()}),
+      );
+
+      final result = await runtime.run(['marketing']);
+
+      expect(result, isNotNull);
+      expect(result!.success, isTrue);
+    },
+  );
+
+  test('Runtime constructs successfully without providing a ToolRegistry', () {
+    expect(
+      () => Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+      ),
+      returnsNormally,
+    );
+  });
 }
