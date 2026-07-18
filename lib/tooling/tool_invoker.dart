@@ -15,7 +15,10 @@ class ToolInvoker {
       return Result.failure('Tool "${toolCall.name}" not found.');
     }
 
-    final context = ToolContext(toolId: toolCall.name);
+    final context = ToolContext(
+      toolId: toolCall.name,
+      arguments: toolCall.arguments,
+    );
 
     try {
       return await tool.execute(context);

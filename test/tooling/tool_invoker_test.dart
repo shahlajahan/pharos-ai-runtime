@@ -104,6 +104,26 @@ void main() {
     expect(tool.capturedContext!.toolId, 'capturing-tool');
   });
 
+  test(
+    'ToolInvoker passes toolCall.arguments through into ToolContext',
+    () async {
+      final tool = _CapturingTool();
+      final invoker = ToolInvoker(
+        registry: ToolRegistry(tools: {tool.id: tool}),
+      );
+      const toolCall = ToolCall(
+        id: 'call_1',
+        name: 'capturing-tool',
+        arguments: '{"query":"Paris"}',
+      );
+
+      await invoker.invoke(toolCall);
+
+      expect(tool.capturedContext, isNotNull);
+      expect(tool.capturedContext!.arguments, '{"query":"Paris"}');
+    },
+  );
+
   test('ToolInvoker locates tools using toolCall.name, ignoring id', () async {
     final tool = _FakeTool();
     final invoker = ToolInvoker(registry: ToolRegistry(tools: {tool.id: tool}));

@@ -1,10 +1,7 @@
-import 'package:pharos_ai_runtime/core/agent.dart';
-import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/employees/employee_definition.dart';
-import 'package:pharos_ai_runtime/hq/hq_boot_result.dart';
-import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
-import 'package:pharos_ai_runtime/hq/hq_source.dart';
+import 'package:pharos_ai_runtime/memory/conversation_memory.dart';
+import 'package:pharos_ai_runtime/memory/memory_author.dart';
 import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/mock_model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_config.dart';
@@ -14,7 +11,6 @@ import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/models/openai_exception.dart';
 import 'package:pharos_ai_runtime/models/streaming_response.dart';
-import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
@@ -29,36 +25,6 @@ import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
 import 'package:test/test.dart';
-
-class _PlaceholderHQSource extends HQSource {
-  @override
-  Future<String> rootPath() async => '/placeholder/hq';
-}
-
-class _StubHQBootstrap extends HQBootstrapper {
-  _StubHQBootstrap(this._employees);
-
-  final List<EmployeeRuntime> _employees;
-
-  @override
-  Future<HQBootResult> boot(HQSource source) async =>
-      HQBootResult(result: Result.success('booted'), employees: _employees);
-}
-
-class _ThrowingAgent extends Agent {
-  @override
-  String get id => 'throwing';
-
-  @override
-  Future<Result> run(ExecutionContext context) async {
-    throw StateError('boom');
-  }
-}
-
-class _ThrowingAgentRegistry extends AgentRegistry {
-  @override
-  Agent? find(String id) => _ThrowingAgent();
-}
 
 class _SpyModelProvider extends MockModelProvider {
   int callCount = 0;
@@ -115,28 +81,6 @@ class _SpyEmployeeResponseHandler extends EmployeeResponseHandler {
 
     return result;
   }
-}
-
-class _TrackingAgent extends Agent {
-  bool executed = false;
-
-  @override
-  String get id => 'marketing';
-
-  @override
-  Future<Result> run(ExecutionContext context) async {
-    executed = true;
-    return Result.success('agent ran');
-  }
-}
-
-class _TrackingAgentRegistry extends AgentRegistry {
-  _TrackingAgentRegistry(this.agent);
-
-  final _TrackingAgent agent;
-
-  @override
-  Agent? find(String id) => agent;
 }
 
 class _OpenAIExceptionModelProvider extends ModelProvider {
@@ -270,6 +214,16 @@ class _FailingSpyToolInvoker extends ToolInvoker {
 }
 
 void main() {
+  const employee = EmployeeRuntime(
+    definition: EmployeeDefinition(
+      id: 'marketing',
+      name: 'Marketing Employee',
+      role: 'Marketing',
+    ),
+    knowledge: [],
+    prompts: [],
+  );
+
   test('Runtime accepts a ModelProvider', () {
     final modelProvider = MockModelProvider();
 
@@ -282,33 +236,38 @@ void main() {
     expect(runtime.modelProvider, same(modelProvider));
   });
 
-  test('Runtime resolves the marketing agent and returns its Result', () async {
-    final runtime = Runtime(
-      modelProvider: MockModelProvider(),
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: DefaultEmployeeResponseHandler(),
-    );
+  test(
+    'Runtime executes the given EmployeeRuntime and returns a Result',
+    () async {
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+      );
 
-    final result = await runtime.run(['marketing']);
+      final result = await runtime.run(employee);
 
-    expect(result, isNotNull);
-    expect(result!.success, isTrue);
-  });
+      expect(result.success, isTrue);
+    },
+  );
 
-  test('Runtime catches agent exceptions and returns Result.failure', () async {
-    final runtime = Runtime(
-      modelProvider: MockModelProvider(),
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: DefaultEmployeeResponseHandler(),
-      registry: _ThrowingAgentRegistry(),
-    );
+  test(
+    'Runtime delegates request creation to RuntimeRequestBuilder, calling '
+    'build() exactly once with the given EmployeeRuntime unchanged',
+    () async {
+      final requestBuilder = _SpyRuntimeRequestBuilder();
+      final runtime = Runtime(
+        modelProvider: MockModelProvider(),
+        requestBuilder: requestBuilder,
+        responseHandler: DefaultEmployeeResponseHandler(),
+      );
 
-    final result = await runtime.run(['throwing']);
+      await runtime.run(employee);
 
-    expect(result, isNotNull);
-    expect(result!.success, isFalse);
-    expect(result.message, contains('boom'));
-  });
+      expect(requestBuilder.callCount, 1);
+      expect(requestBuilder.capturedEmployee, same(employee));
+    },
+  );
 
   test('Runtime calls modelProvider.generate() exactly once', () async {
     final modelProvider = _SpyModelProvider();
@@ -318,162 +277,23 @@ void main() {
       responseHandler: DefaultEmployeeResponseHandler(),
     );
 
-    await runtime.run(['marketing']);
+    await runtime.run(employee);
 
     expect(modelProvider.callCount, 1);
   });
 
-  test('Runtime calls modelProvider.generate() with a ModelRequest', () async {
-    final modelProvider = _SpyModelProvider();
-    final runtime = Runtime(
-      modelProvider: modelProvider,
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: DefaultEmployeeResponseHandler(),
-    );
-
-    await runtime.run(['marketing']);
-
-    expect(modelProvider.capturedRequest, isA<ModelRequest>());
-  });
-
-  test(
-    'Runtime selects the matching EmployeeRuntime after a successful boot',
-    () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
-      final runtime = Runtime(
-        modelProvider: MockModelProvider(),
-        requestBuilder: DefaultRuntimeRequestBuilder(),
-        responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
-      );
-
-      final result = await runtime.run([
-        'marketing',
-      ], source: _PlaceholderHQSource());
-
-      expect(result, isNotNull);
-      expect(result!.success, isTrue);
-    },
-  );
-
-  test('Runtime returns Result.failure when no employee matches the requested '
-      'id', () async {
-    final runtime = Runtime(
-      modelProvider: MockModelProvider(),
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap(const []),
-    );
-
-    final result = await runtime.run([
-      'marketing',
-    ], source: _PlaceholderHQSource());
-
-    expect(result, isNotNull);
-    expect(result!.success, isFalse);
-    expect(result.message, contains('marketing'));
-  });
-
-  test(
-    'Runtime delegates request creation to RuntimeRequestBuilder, calling '
-    'build() exactly once with the selected EmployeeRuntime unchanged',
-    () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
-      final requestBuilder = _SpyRuntimeRequestBuilder();
-      final runtime = Runtime(
-        modelProvider: MockModelProvider(),
-        requestBuilder: requestBuilder,
-        responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
-      );
-
-      await runtime.run(['marketing'], source: _PlaceholderHQSource());
-
-      expect(requestBuilder.callCount, 1);
-      expect(requestBuilder.capturedEmployee, same(employee));
-    },
-  );
-
-  test(
-    'Runtime does not invoke RuntimeRequestBuilder on the legacy no-HQ path',
-    () async {
-      final requestBuilder = _SpyRuntimeRequestBuilder();
-      final runtime = Runtime(
-        modelProvider: MockModelProvider(),
-        requestBuilder: requestBuilder,
-        responseHandler: DefaultEmployeeResponseHandler(),
-      );
-
-      await runtime.run(['marketing']);
-
-      expect(requestBuilder.callCount, 0);
-    },
-  );
-
-  test(
-    'Runtime calls modelProvider.generate() exactly once on the HQ path',
-    () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
-      final modelProvider = _SpyModelProvider();
-      final runtime = Runtime(
-        modelProvider: modelProvider,
-        requestBuilder: DefaultRuntimeRequestBuilder(),
-        responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
-      );
-
-      await runtime.run(['marketing'], source: _PlaceholderHQSource());
-
-      expect(modelProvider.callCount, 1);
-    },
-  );
-
-  test('Runtime calls EmployeeResponseHandler.handle() exactly once on the HQ '
-      'path, forwarding the selected EmployeeRuntime and generated '
-      'ModelResponse unchanged', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
+  test('Runtime calls EmployeeResponseHandler.handle() exactly once, '
+      'forwarding the given EmployeeRuntime and generated ModelResponse '
+      'unchanged', () async {
     final modelProvider = _SpyModelProvider();
     final responseHandler = _SpyEmployeeResponseHandler();
     final runtime = Runtime(
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: responseHandler,
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     expect(responseHandler.callCount, 1);
     expect(responseHandler.capturedEmployee, same(employee));
@@ -486,199 +306,82 @@ void main() {
   test(
     'Runtime returns exactly the Result returned by EmployeeResponseHandler',
     () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
       final responseHandler = _SpyEmployeeResponseHandler()
         ..result = Result.failure('handler failure');
       final runtime = Runtime(
         modelProvider: MockModelProvider(),
         requestBuilder: DefaultRuntimeRequestBuilder(),
         responseHandler: responseHandler,
-        bootstrap: _StubHQBootstrap([employee]),
       );
 
-      final result = await runtime.run([
-        'marketing',
-      ], source: _PlaceholderHQSource());
+      final result = await runtime.run(employee);
 
       expect(result, same(responseHandler.result));
     },
   );
 
-  test('Runtime does not execute the Agent pipeline on the HQ '
-      'response-handler path', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
-    final agent = _TrackingAgent();
+  test('Runtime returns the handler Result when the ModelProvider '
+      'succeeds', () async {
     final runtime = Runtime(
       modelProvider: MockModelProvider(),
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      registry: _TrackingAgentRegistry(agent),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    final result = await runtime.run(employee);
 
-    expect(agent.executed, isFalse);
+    expect(result.success, isTrue);
   });
 
-  test('Runtime does not invoke EmployeeResponseHandler on the legacy no-HQ '
-      'path', () async {
-    final responseHandler = _SpyEmployeeResponseHandler();
-    final runtime = Runtime(
-      modelProvider: MockModelProvider(),
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: responseHandler,
-    );
+  test(
+    'Runtime converts OpenAIException into Result.failure(message)',
+    () async {
+      final runtime = Runtime(
+        modelProvider: _OpenAIExceptionModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+      );
 
-    await runtime.run(['marketing']);
+      final result = await runtime.run(employee);
 
-    expect(responseHandler.callCount, 0);
-  });
-
-  test('Runtime still returns the handler Result when the ModelProvider '
-      'succeeds on the HQ path', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
-    final runtime = Runtime(
-      modelProvider: MockModelProvider(),
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
-    );
-
-    final result = await runtime.run([
-      'marketing',
-    ], source: _PlaceholderHQSource());
-
-    expect(result, isNotNull);
-    expect(result!.success, isTrue);
-  });
-
-  test('Runtime converts OpenAIException into Result.failure(message) on '
-      'the HQ path', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
-    final runtime = Runtime(
-      modelProvider: _OpenAIExceptionModelProvider(),
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
-    );
-
-    final result = await runtime.run([
-      'marketing',
-    ], source: _PlaceholderHQSource());
-
-    expect(result, isNotNull);
-    expect(result!.success, isFalse);
-    expect(result.message, 'rate limit exceeded');
-  });
+      expect(result.success, isFalse);
+      expect(result.message, 'rate limit exceeded');
+    },
+  );
 
   test('Runtime converts any ModelException (not just OpenAIException) into '
-      'Result.failure(message) on the HQ path', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
+      'Result.failure(message)', () async {
     final runtime = Runtime(
       modelProvider: _CustomModelExceptionModelProvider(),
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    final result = await runtime.run([
-      'marketing',
-    ], source: _PlaceholderHQSource());
+    final result = await runtime.run(employee);
 
-    expect(result, isNotNull);
-    expect(result!.success, isFalse);
+    expect(result.success, isFalse);
     expect(result.message, 'custom model failure');
   });
 
-  test('Runtime lets StateError propagate uncaught on the HQ path', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
+  test('Runtime lets StateError propagate uncaught', () async {
     final runtime = Runtime(
       modelProvider: _StateErrorModelProvider(),
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    expect(
-      () => runtime.run(['marketing'], source: _PlaceholderHQSource()),
-      throwsA(isA<StateError>()),
-    );
+    expect(() => runtime.run(employee), throwsA(isA<StateError>()));
   });
 
-  test(
-    'Runtime lets FormatException propagate uncaught on the HQ path',
-    () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
-      final runtime = Runtime(
-        modelProvider: _FormatExceptionModelProvider(),
-        requestBuilder: DefaultRuntimeRequestBuilder(),
-        responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
-      );
+  test('Runtime lets FormatException propagate uncaught', () async {
+    final runtime = Runtime(
+      modelProvider: _FormatExceptionModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
 
-      expect(
-        () => runtime.run(['marketing'], source: _PlaceholderHQSource()),
-        throwsA(isA<FormatException>()),
-      );
-    },
-  );
+    expect(() => runtime.run(employee), throwsA(isA<FormatException>()));
+  });
 
   test(
     'Runtime accepts a custom ToolRegistry without changing behavior',
@@ -690,10 +393,9 @@ void main() {
         toolRegistry: ToolRegistry(tools: {'noop': _NoopTool()}),
       );
 
-      final result = await runtime.run(['marketing']);
+      final result = await runtime.run(employee);
 
-      expect(result, isNotNull);
-      expect(result!.success, isTrue);
+      expect(result.success, isTrue);
     },
   );
 
@@ -711,15 +413,6 @@ void main() {
   test(
     'Runtime forwards ToolRegistry.definitions() into RuntimeRequestBuilder',
     () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
       const definition = ToolDefinition(
         id: 'search',
         description: 'Search the web.',
@@ -729,11 +422,10 @@ void main() {
         modelProvider: MockModelProvider(),
         requestBuilder: requestBuilder,
         responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
         toolRegistry: const ToolRegistry(definitions: {'search': definition}),
       );
 
-      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+      await runtime.run(employee);
 
       expect(requestBuilder.capturedTools, [definition]);
     },
@@ -742,24 +434,14 @@ void main() {
   test(
     'Runtime forwards an empty tool list when no ToolRegistry is provided',
     () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
       final requestBuilder = _SpyRuntimeRequestBuilder();
       final runtime = Runtime(
         modelProvider: MockModelProvider(),
         requestBuilder: requestBuilder,
         responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
       );
 
-      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+      await runtime.run(employee);
 
       expect(requestBuilder.capturedTools, isEmpty);
     },
@@ -768,40 +450,21 @@ void main() {
   test(
     'Runtime never invokes ToolInvoker when response.toolCalls is empty',
     () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
       final toolInvoker = _SpyToolInvoker();
       final runtime = Runtime(
         modelProvider: _ConfigurableModelProvider(),
         requestBuilder: DefaultRuntimeRequestBuilder(),
         responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
         toolInvoker: toolInvoker,
       );
 
-      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+      await runtime.run(employee);
 
       expect(toolInvoker.invokedToolCalls, isEmpty);
     },
   );
 
   test('Runtime executes a single tool call once', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _ConfigurableModelProvider()
       ..response = const ModelResponse(
         text: 'ok',
@@ -812,25 +475,15 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: toolInvoker,
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     expect(toolInvoker.invokedToolCalls.map((call) => call.name), ['search']);
   });
 
   test('Runtime executes multiple tool calls sequentially, in order', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _ConfigurableModelProvider()
       ..response = const ModelResponse(
         text: 'ok',
@@ -844,11 +497,10 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: toolInvoker,
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     expect(toolInvoker.invokedToolCalls.map((call) => call.name), [
       'search',
@@ -859,15 +511,6 @@ void main() {
   test(
     'Runtime forwards the original ToolCall unchanged into ToolInvoker',
     () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
       const toolCall = ToolCall(
         id: 'call_1',
         name: 'search',
@@ -880,11 +523,10 @@ void main() {
         modelProvider: modelProvider,
         requestBuilder: DefaultRuntimeRequestBuilder(),
         responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
         toolInvoker: toolInvoker,
       );
 
-      await runtime.run(['marketing'], source: _PlaceholderHQSource());
+      await runtime.run(employee);
 
       expect(toolInvoker.invokedToolCalls, [same(toolCall)]);
     },
@@ -892,15 +534,6 @@ void main() {
 
   test('Runtime still returns the response-handler Result when tool calls '
       'exist', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _ConfigurableModelProvider()
       ..response = const ModelResponse(
         text: 'ok',
@@ -912,28 +545,16 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: responseHandler,
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: _SpyToolInvoker(),
     );
 
-    final result = await runtime.run([
-      'marketing',
-    ], source: _PlaceholderHQSource());
+    final result = await runtime.run(employee);
 
     expect(result, same(responseHandler.result));
   });
 
   test('Runtime does not crash when tool execution fails, and still returns '
       'the original Result, exactly as ToolInvoker already defines', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _ConfigurableModelProvider()
       ..response = const ModelResponse(
         text: 'ok',
@@ -945,29 +566,16 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: ToolInvoker(registry: const ToolRegistry()),
     );
 
-    final result = await runtime.run([
-      'marketing',
-    ], source: _PlaceholderHQSource());
+    final result = await runtime.run(employee);
 
-    expect(result, isNotNull);
-    expect(result!.success, isTrue);
+    expect(result.success, isTrue);
   });
 
   test('Runtime still invokes every tool call, and still returns the '
       'response-handler Result, even when tool executions fail', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _ConfigurableModelProvider()
       ..response = const ModelResponse(
         text: 'ok',
@@ -983,13 +591,10 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: responseHandler,
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: toolInvoker,
     );
 
-    final result = await runtime.run([
-      'marketing',
-    ], source: _PlaceholderHQSource());
+    final result = await runtime.run(employee);
 
     expect(toolInvoker.invokedToolCalls.map((call) => call.name), [
       'search',
@@ -1000,40 +605,21 @@ void main() {
 
   test('Runtime calls modelProvider.generate() exactly once when no tool '
       'calls exist', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _TwoStepModelProvider()
       ..firstResponse = const ModelResponse(text: 'ok');
     final runtime = Runtime(
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     expect(modelProvider.callCount, 1);
   });
 
   test('Runtime calls modelProvider.generate() exactly twice when tool '
       'calls exist', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _TwoStepModelProvider()
       ..firstResponse = const ModelResponse(
         text: '',
@@ -1044,25 +630,15 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     expect(modelProvider.callCount, 2);
   });
 
   test('Runtime sends every ToolOutput in the second request, preserving '
       'toolCallId and toolName', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const toolCall1 = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
     const toolCall2 = ToolCall(
       id: 'call_2',
@@ -1079,10 +655,9 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     final secondRequest = modelProvider.capturedRequests[1];
     expect(secondRequest.toolOutputs, hasLength(2));
@@ -1094,15 +669,6 @@ void main() {
 
   test('Runtime passes the second ModelResponse into EmployeeResponseHandler '
       'when tool calls were executed', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const secondResponse = ModelResponse(text: 'final answer');
     final modelProvider = _TwoStepModelProvider()
       ..firstResponse = const ModelResponse(
@@ -1115,25 +681,15 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: responseHandler,
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     expect(responseHandler.capturedResponse, same(secondResponse));
   });
 
   test('Runtime appends an AssistantMessage with the response content and '
       'toolCalls after tool execution', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _TwoStepModelProvider()
       ..firstResponse = const ModelResponse(
         text: 'let me check',
@@ -1144,10 +700,9 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     final firstRequest = modelProvider.capturedRequests[0];
     final secondRequest = modelProvider.capturedRequests[1];
@@ -1165,15 +720,6 @@ void main() {
 
   test('Runtime appends a ToolMessage per executed tool call, after the '
       'AssistantMessage and in ToolCall order', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const toolCall1 = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
     const toolCall2 = ToolCall(
       id: 'call_2',
@@ -1191,11 +737,10 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: toolInvoker,
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     final secondRequest = modelProvider.capturedRequests[1];
     final firstLength =
@@ -1219,15 +764,6 @@ void main() {
 
   test('Runtime creates the second ModelRequest from the updated Conversation, '
       'preserving the original conversation prefix unchanged', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _TwoStepModelProvider()
       ..firstResponse = const ModelResponse(
         text: '',
@@ -1238,10 +774,9 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     final firstRequest = modelProvider.capturedRequests[0];
     final secondRequest = modelProvider.capturedRequests[1];
@@ -1255,31 +790,88 @@ void main() {
   });
 
   test('Runtime makes no second request when no tool calls exist', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     final modelProvider = _TwoStepModelProvider()
       ..firstResponse = const ModelResponse(text: 'ok');
     final runtime = Runtime(
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.run(['marketing'], source: _PlaceholderHQSource());
+    await runtime.run(employee);
 
     expect(modelProvider.capturedRequests, hasLength(1));
   });
 
-  test('run() does not call modelProvider.stream() on the existing '
-      'synchronous path', () async {
+  test('run() does not record into memory when none is given', () async {
+    final runtime = Runtime(
+      modelProvider: MockModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    // No memory passed; only asserting run() completes normally without one.
+    final result = await runtime.run(employee);
+
+    expect(result.success, isTrue);
+  });
+
+  test('run() records the UserMessage and AssistantMessage into the given '
+      'memory when no tool calls exist, excluding the SystemMessage', () async {
+    final memory = ConversationMemory();
+    final modelProvider = _ConfigurableModelProvider()
+      ..response = const ModelResponse(text: 'final answer');
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    await runtime.run(employee, memory: memory);
+
+    final entries = await memory.readAll();
+
+    expect(entries, hasLength(2));
+    expect(entries[0].author, MemoryAuthor.user);
+    expect(entries[1].author, MemoryAuthor.employee);
+    expect(entries[1].content, 'final answer');
+  });
+
+  test(
+    'run() records the AssistantMessage, each ToolMessage, and the final '
+    'AssistantMessage into the given memory when tool calls exist, in order',
+    () async {
+      final memory = ConversationMemory();
+      final modelProvider = _TwoStepModelProvider()
+        ..firstResponse = const ModelResponse(
+          text: 'let me check',
+          toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+        )
+        ..secondResponse = const ModelResponse(text: 'final answer');
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        toolInvoker: _SpyToolInvoker(),
+      );
+
+      await runtime.run(employee, memory: memory);
+
+      final entries = await memory.readAll();
+
+      // UserMessage, first AssistantMessage, ToolMessage, second
+      // AssistantMessage. SystemMessage is excluded.
+      expect(entries, hasLength(4));
+      expect(entries[0].author, MemoryAuthor.user);
+      expect(entries[1].author, MemoryAuthor.employee);
+      expect(entries[1].content, 'let me check');
+      expect(entries[2].author, MemoryAuthor.tool);
+      expect(entries[3].author, MemoryAuthor.employee);
+      expect(entries[3].content, 'final answer');
+    },
+  );
+
+  test('run() does not call modelProvider.stream()', () async {
     final modelProvider = _StreamingModelProvider();
     final runtime = Runtime(
       modelProvider: modelProvider,
@@ -1287,7 +879,7 @@ void main() {
       responseHandler: DefaultEmployeeResponseHandler(),
     );
 
-    await runtime.run(['marketing']);
+    await runtime.run(employee);
 
     expect(modelProvider.streamCallCount, 0);
   });
@@ -1338,63 +930,37 @@ void main() {
     },
   );
 
-  test(
-    'stream() resolves the employee via bootstrap and delegates to '
-    'modelProvider.stream() with a ModelRequest built for that employee',
-    () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
-      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
-      const definition = ToolDefinition(
-        id: 'search',
-        description: 'Search the web.',
-      );
-      final modelProvider = _StreamingModelProvider()
-        ..chunks = const [ModelResponseChunk(isFinished: true)];
-      final runtime = Runtime(
-        modelProvider: modelProvider,
-        requestBuilder: DefaultRuntimeRequestBuilder(),
-        responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
-        toolRegistry: const ToolRegistry(definitions: {'search': definition}),
-      );
+  test('stream() delegates to modelProvider.stream() with a ModelRequest built '
+      'for the given employee', () async {
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const definition = ToolDefinition(
+      id: 'search',
+      description: 'Search the web.',
+    );
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [ModelResponseChunk(isFinished: true)];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      toolRegistry: const ToolRegistry(definitions: {'search': definition}),
+    );
 
-      await runtime.stream(
-        ['marketing'],
-        modelConfig,
-        source: _PlaceholderHQSource(),
-      );
+    await runtime.stream(employee, modelConfig);
 
-      expect(modelProvider.streamCallCount, 1);
-      expect(modelProvider.capturedStreamModelConfig, same(modelConfig));
-      expect(modelProvider.capturedStreamRequest!.tools, [definition]);
-      expect(
-        (modelProvider.capturedStreamRequest!.conversation.messages[0]
-                as SystemMessage)
-            .content,
-        contains('Marketing Employee'),
-      );
-    },
-  );
+    expect(modelProvider.streamCallCount, 1);
+    expect(modelProvider.capturedStreamModelConfig, same(modelConfig));
+    expect(modelProvider.capturedStreamRequest!.tools, [definition]);
+    expect(
+      (modelProvider.capturedStreamRequest!.conversation.messages[0]
+              as SystemMessage)
+          .content,
+      contains('Marketing Employee'),
+    );
+  });
 
   test('stream() returns a Runtime-owned StreamingResponse, not the '
       'ModelProvider instance directly', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     final modelProvider = _StreamingModelProvider()
       ..chunks = const [ModelResponseChunk(isFinished: true)];
@@ -1402,30 +968,15 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    final result = await runtime.stream(
-      ['marketing'],
-      modelConfig,
-      source: _PlaceholderHQSource(),
-    );
+    final result = await runtime.stream(employee, modelConfig);
 
-    expect(result, isNotNull);
     expect(result, isNot(same(modelProvider.returnedStreamingResponse)));
   });
 
   test('stream() forwards every chunk produced by the provider unchanged, '
       'in order, without aggregating', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     const toolCall = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
     const providerChunks = [
@@ -1439,15 +990,10 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    final result = await runtime.stream(
-      ['marketing'],
-      modelConfig,
-      source: _PlaceholderHQSource(),
-    );
-    final forwardedChunks = await result!.stream.toList();
+    final result = await runtime.stream(employee, modelConfig);
+    final forwardedChunks = await result.stream.toList();
 
     expect(forwardedChunks, hasLength(providerChunks.length));
 
@@ -1460,15 +1006,6 @@ void main() {
 
   test('stream() does not execute any tool calls until the returned stream is '
       'consumed', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     final toolInvoker = _SpyToolInvoker();
     final modelProvider = _StreamingModelProvider()
@@ -1482,30 +1019,16 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: toolInvoker,
     );
 
-    await runtime.stream(
-      ['marketing'],
-      modelConfig,
-      source: _PlaceholderHQSource(),
-    );
+    await runtime.stream(employee, modelConfig);
 
     expect(toolInvoker.invokedToolCalls, isEmpty);
   });
 
   test('stream() executes a completed ToolCall exactly once while the '
       'returned stream is consumed, forwarding chunks unchanged', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     const toolCall = ToolCall(
       id: 'call_1',
@@ -1522,16 +1045,11 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: toolInvoker,
     );
 
-    final result = await runtime.stream(
-      ['marketing'],
-      modelConfig,
-      source: _PlaceholderHQSource(),
-    );
-    final forwardedChunks = await result!.stream.toList();
+    final result = await runtime.stream(employee, modelConfig);
+    final forwardedChunks = await result.stream.toList();
 
     expect(toolInvoker.invokedToolCalls, hasLength(1));
     expect(toolInvoker.invokedToolCalls[0].id, 'call_1');
@@ -1546,15 +1064,6 @@ void main() {
   test(
     'stream() executes each of multiple completed ToolCalls exactly once',
     () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
       const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
       final toolInvoker = _SpyToolInvoker();
       final modelProvider = _StreamingModelProvider()
@@ -1575,16 +1084,11 @@ void main() {
         modelProvider: modelProvider,
         requestBuilder: DefaultRuntimeRequestBuilder(),
         responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
         toolInvoker: toolInvoker,
       );
 
-      final result = await runtime.stream(
-        ['marketing'],
-        modelConfig,
-        source: _PlaceholderHQSource(),
-      );
-      await result!.stream.toList();
+      final result = await runtime.stream(employee, modelConfig);
+      await result.stream.toList();
 
       expect(toolInvoker.invokedToolCalls.map((c) => c.id), [
         'call_1',
@@ -1597,15 +1101,6 @@ void main() {
     'stream() records each executed ToolCall as an AssistantMessage/'
     'ToolMessage pair in the internal Conversation, in execution order',
     () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
       const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
       final toolInvoker = _SpyToolInvoker();
       final modelProvider = _StreamingModelProvider()
@@ -1626,16 +1121,11 @@ void main() {
         modelProvider: modelProvider,
         requestBuilder: DefaultRuntimeRequestBuilder(),
         responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
         toolInvoker: toolInvoker,
       );
 
-      final result = await runtime.stream(
-        ['marketing'],
-        modelConfig,
-        source: _PlaceholderHQSource(),
-      );
-      await result!.stream.toList();
+      final result = await runtime.stream(employee, modelConfig);
+      await result.stream.toList();
 
       // Reaches the Runtime-internal conversation getter dynamically: the
       // concrete StreamingResponse type is private (not part of the public
@@ -1671,15 +1161,6 @@ void main() {
   test('stream() does not mutate the Conversation after streaming begins: the '
       'request sent to the provider contains exactly the messages '
       'RuntimeRequestBuilder produced', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     final modelProvider = _StreamingModelProvider()
       ..chunks = const [
@@ -1690,15 +1171,10 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
     );
     final expectedRequest = DefaultRuntimeRequestBuilder().build(employee);
 
-    await runtime.stream(
-      ['marketing'],
-      modelConfig,
-      source: _PlaceholderHQSource(),
-    );
+    await runtime.stream(employee, modelConfig);
 
     expect(
       modelProvider.capturedStreamRequest!.conversation.messages,
@@ -1706,68 +1182,9 @@ void main() {
     );
   });
 
-  test('stream() returns null when args is empty', () async {
-    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
-    final runtime = Runtime(
-      modelProvider: _StreamingModelProvider(),
-      requestBuilder: DefaultRuntimeRequestBuilder(),
-      responseHandler: DefaultEmployeeResponseHandler(),
-    );
-
-    final result = await runtime.stream([], modelConfig);
-
-    expect(result, isNull);
-  });
-
-  test(
-    'stream() returns null when no employee matches the requested id',
-    () async {
-      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
-      final runtime = Runtime(
-        modelProvider: _StreamingModelProvider(),
-        requestBuilder: DefaultRuntimeRequestBuilder(),
-        responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap(const []),
-      );
-
-      final result = await runtime.stream(
-        ['marketing'],
-        modelConfig,
-        source: _PlaceholderHQSource(),
-      );
-
-      expect(result, isNull);
-    },
-  );
-
-  test(
-    'stream() returns null when no bootstrap/source is configured',
-    () async {
-      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
-      final runtime = Runtime(
-        modelProvider: _StreamingModelProvider(),
-        requestBuilder: DefaultRuntimeRequestBuilder(),
-        responseHandler: DefaultEmployeeResponseHandler(),
-      );
-
-      final result = await runtime.stream(['marketing'], modelConfig);
-
-      expect(result, isNull);
-    },
-  );
-
   test(
     'stream() makes no follow-up request when no ToolCalls occurred',
     () async {
-      const employee = EmployeeRuntime(
-        definition: EmployeeDefinition(
-          id: 'marketing',
-          name: 'Marketing Employee',
-          role: 'Marketing',
-        ),
-        knowledge: [],
-        prompts: [],
-      );
       const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
       final modelProvider = _StreamingModelProvider()
         ..chunks = const [
@@ -1778,15 +1195,10 @@ void main() {
         modelProvider: modelProvider,
         requestBuilder: DefaultRuntimeRequestBuilder(),
         responseHandler: DefaultEmployeeResponseHandler(),
-        bootstrap: _StubHQBootstrap([employee]),
       );
 
-      final result = await runtime.stream(
-        ['marketing'],
-        modelConfig,
-        source: _PlaceholderHQSource(),
-      );
-      await result!.stream.toList();
+      final result = await runtime.stream(employee, modelConfig);
+      await result.stream.toList();
 
       expect(modelProvider.streamCallCount, 1);
     },
@@ -1795,15 +1207,6 @@ void main() {
   test('stream() makes exactly one follow-up request when a ToolCall '
       'executed, using the updated Conversation, and forwards both provider '
       'streams as one continuous stream', () async {
-    const employee = EmployeeRuntime(
-      definition: EmployeeDefinition(
-        id: 'marketing',
-        name: 'Marketing Employee',
-        role: 'Marketing',
-      ),
-      knowledge: [],
-      prompts: [],
-    );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
     final toolInvoker = _SpyToolInvoker();
     final modelProvider = _StreamingModelProvider()
@@ -1821,16 +1224,11 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: toolInvoker,
     );
 
-    final result = await runtime.stream(
-      ['marketing'],
-      modelConfig,
-      source: _PlaceholderHQSource(),
-    );
-    final forwardedChunks = await result!.stream.toList();
+    final result = await runtime.stream(employee, modelConfig);
+    final forwardedChunks = await result.stream.toList();
 
     expect(modelProvider.streamCallCount, 2);
 

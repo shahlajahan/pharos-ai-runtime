@@ -1,9 +1,13 @@
 import 'dart:io';
 
+import 'package:pharos_ai_runtime/core/agent.dart';
+import 'package:pharos_ai_runtime/core/config.dart';
+import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/employees/employee_repository.dart';
 import 'package:pharos_ai_runtime/employees/markdown_employee_parser.dart';
 import 'package:pharos_ai_runtime/hq/employee_discovery.dart';
 import 'package:pharos_ai_runtime/hq/employee_loader.dart';
+import 'package:pharos_ai_runtime/hq/hq.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrap.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
 import 'package:pharos_ai_runtime/hq/hq_validator.dart';
@@ -18,11 +22,9 @@ import 'package:pharos_ai_runtime/models/openai_environment.dart';
 import 'package:pharos_ai_runtime/models/openai_provider_factory.dart';
 import 'package:pharos_ai_runtime/prompts/markdown_prompt_parser.dart';
 import 'package:pharos_ai_runtime/prompts/prompt_repository.dart';
-import 'package:pharos_ai_runtime/runtime/default_employee_response_handler.dart';
-import 'package:pharos_ai_runtime/runtime/default_runtime_request_builder.dart';
+import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/employee_factory.dart';
-import 'package:pharos_ai_runtime/runtime/runtime.dart';
-import 'package:pharos_ai_runtime/runtime/runtime_runner.dart';
+import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 
 void main(List<String> arguments) async {
   final agentArgs = <String>[];
@@ -67,14 +69,35 @@ void main(List<String> arguments) async {
     registry: ModelRegistry(providers: providers),
   );
 
-  final runtime = Runtime(
-    modelProvider: provider,
-    requestBuilder: DefaultRuntimeRequestBuilder(),
-    responseHandler: DefaultEmployeeResponseHandler(),
-    bootstrap: bootstrap,
-  );
+  if (bootstrap != null && source != null) {
+    final hq = HQ(
+      modelProvider: provider,
+      bootstrap: bootstrap,
+      source: source,
+    );
 
-  final runner = RuntimeRunner(runtime: runtime);
+    await hq.execute(
+      employee: agentArgs.isNotEmpty ? agentArgs.first : '',
+      goal: '',
+    );
 
-  await runner.run(args: agentArgs, source: source);
+    return;
+  }
+
+  const logger = Logger();
+
+  if (agentArgs.isEmpty) {
+    logger.info('Usage:');
+    logger.info('pharos marketing');
+    return;
+  }
+
+  final Agent? agent = AgentRegistry().find(agentArgs.first);
+
+  if (agent == null) {
+    logger.warning('Unknown agent.');
+    return;
+  }
+
+  await const ExecutionPipeline(config: Config(), logger: logger).run(agent);
 }
