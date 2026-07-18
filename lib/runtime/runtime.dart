@@ -146,7 +146,21 @@ class Runtime {
       return null;
     }
 
-    return modelProvider.stream(prepared.request!, modelConfig);
+    return _streamPipeline(prepared.request!, modelConfig);
+  }
+
+  /// Internal Runtime streaming pipeline: calls ModelProvider.stream() and
+  /// wraps the result in a Runtime-owned StreamingResponse. For now this is
+  /// a transparent pass-through — every chunk is forwarded unchanged — but
+  /// it is the seam future tasks will use to intercept ToolCalls without
+  /// changing stream()'s public contract.
+  Future<StreamingResponse> _streamPipeline(
+    ModelRequest request,
+    ModelConfig modelConfig,
+  ) async {
+    final providerStream = await modelProvider.stream(request, modelConfig);
+
+    return _RuntimeStreamingResponse(providerStream);
   }
 
   /// Shared execution preparation for run() and stream(): validates args,
@@ -267,4 +281,21 @@ class _PreparedExecution {
   final Result? bootFailure;
 
   bool get isReady => employee != null && request != null;
+}
+
+/// Runtime-owned StreamingResponse returned by [Runtime._streamPipeline].
+/// Forwards every chunk from the underlying provider StreamingResponse
+/// unchanged.
+class _RuntimeStreamingResponse implements StreamingResponse {
+  _RuntimeStreamingResponse(StreamingResponse source)
+    : stream = _forward(source);
+
+  @override
+  final Stream<ModelResponseChunk> stream;
+
+  static Stream<ModelResponseChunk> _forward(StreamingResponse source) async* {
+    await for (final chunk in source.stream) {
+      yield chunk;
+    }
+  }
 }

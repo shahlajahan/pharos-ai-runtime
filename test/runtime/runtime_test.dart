@@ -1329,8 +1329,54 @@ void main() {
     },
   );
 
-  test('stream() delegates to modelProvider.stream() with a ModelRequest '
-      'reflecting the given employee and modelConfig', () async {
+  test(
+    'stream() resolves the employee via bootstrap and delegates to '
+    'modelProvider.stream() with a ModelRequest built for that employee',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+      const definition = ToolDefinition(
+        id: 'search',
+        description: 'Search the web.',
+      );
+      final modelProvider = _StreamingModelProvider()
+        ..chunks = const [ModelResponseChunk(isFinished: true)];
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+        toolRegistry: const ToolRegistry(definitions: {'search': definition}),
+      );
+
+      await runtime.stream(
+        ['marketing'],
+        modelConfig,
+        source: _PlaceholderHQSource(),
+      );
+
+      expect(modelProvider.streamCallCount, 1);
+      expect(modelProvider.capturedStreamModelConfig, same(modelConfig));
+      expect(modelProvider.capturedStreamRequest!.tools, [definition]);
+      expect(
+        (modelProvider.capturedStreamRequest!.conversation.messages[0]
+                as SystemMessage)
+            .content,
+        contains('Marketing Employee'),
+      );
+    },
+  );
+
+  test('stream() returns a Runtime-owned StreamingResponse, not the '
+      'ModelProvider instance directly', () async {
     const employee = EmployeeRuntime(
       definition: EmployeeDefinition(
         id: 'marketing',
@@ -1341,28 +1387,27 @@ void main() {
       prompts: [],
     );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
-    const definition = ToolDefinition(
-      id: 'search',
-      description: 'Search the web.',
-    );
     final modelProvider = _StreamingModelProvider()
       ..chunks = const [ModelResponseChunk(isFinished: true)];
     final runtime = Runtime(
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
-      toolRegistry: const ToolRegistry(definitions: {'search': definition}),
+      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    await runtime.stream(employee, modelConfig);
+    final result = await runtime.stream(
+      ['marketing'],
+      modelConfig,
+      source: _PlaceholderHQSource(),
+    );
 
-    expect(modelProvider.streamCallCount, 1);
-    expect(modelProvider.capturedStreamModelConfig, same(modelConfig));
-    expect(modelProvider.capturedStreamRequest!.tools, [definition]);
+    expect(result, isNotNull);
+    expect(result, isNot(same(modelProvider.returnedStreamingResponse)));
   });
 
-  test('stream() returns the StreamingResponse from modelProvider.stream() '
-      'unchanged, without aggregating it', () async {
+  test('stream() forwards every chunk produced by the provider unchanged, '
+      'in order, without aggregating', () async {
     const employee = EmployeeRuntime(
       definition: EmployeeDefinition(
         id: 'marketing',
@@ -1373,17 +1418,35 @@ void main() {
       prompts: [],
     );
     const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
-    final modelProvider = _StreamingModelProvider()
-      ..chunks = const [ModelResponseChunk(isFinished: true)];
+    const toolCall = ToolCall(id: 'call_1', name: 'search', arguments: '{}');
+    const providerChunks = [
+      ModelResponseChunk(textDelta: 'Hello'),
+      ModelResponseChunk(textDelta: ' world'),
+      ModelResponseChunk(toolCalls: [toolCall]),
+      ModelResponseChunk(isFinished: true),
+    ];
+    final modelProvider = _StreamingModelProvider()..chunks = providerChunks;
     final runtime = Runtime(
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
     );
 
-    final result = await runtime.stream(employee, modelConfig);
+    final result = await runtime.stream(
+      ['marketing'],
+      modelConfig,
+      source: _PlaceholderHQSource(),
+    );
+    final forwardedChunks = await result!.stream.toList();
 
-    expect(result, same(modelProvider.returnedStreamingResponse));
+    expect(forwardedChunks, hasLength(providerChunks.length));
+
+    for (var i = 0; i < providerChunks.length; i++) {
+      expect(forwardedChunks[i].textDelta, providerChunks[i].textDelta);
+      expect(forwardedChunks[i].toolCalls, providerChunks[i].toolCalls);
+      expect(forwardedChunks[i].isFinished, providerChunks[i].isFinished);
+    }
   });
 
   test('stream() never executes any tool calls', () async {
@@ -1409,11 +1472,104 @@ void main() {
       modelProvider: modelProvider,
       requestBuilder: DefaultRuntimeRequestBuilder(),
       responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
       toolInvoker: toolInvoker,
     );
 
-    await runtime.stream(employee, modelConfig);
+    await runtime.stream(
+      ['marketing'],
+      modelConfig,
+      source: _PlaceholderHQSource(),
+    );
 
     expect(toolInvoker.invokedToolCalls, isEmpty);
   });
+
+  test('stream() does not mutate the Conversation after streaming begins: the '
+      'request sent to the provider contains exactly the messages '
+      'RuntimeRequestBuilder produced', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [
+        ModelResponseChunk(textDelta: 'Hello'),
+        ModelResponseChunk(isFinished: true),
+      ];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+    );
+    final expectedRequest = DefaultRuntimeRequestBuilder().build(employee);
+
+    await runtime.stream(
+      ['marketing'],
+      modelConfig,
+      source: _PlaceholderHQSource(),
+    );
+
+    expect(
+      modelProvider.capturedStreamRequest!.conversation.messages,
+      hasLength(expectedRequest.conversation.messages.length),
+    );
+  });
+
+  test('stream() returns null when args is empty', () async {
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    final runtime = Runtime(
+      modelProvider: _StreamingModelProvider(),
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    final result = await runtime.stream([], modelConfig);
+
+    expect(result, isNull);
+  });
+
+  test(
+    'stream() returns null when no employee matches the requested id',
+    () async {
+      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+      final runtime = Runtime(
+        modelProvider: _StreamingModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap(const []),
+      );
+
+      final result = await runtime.stream(
+        ['marketing'],
+        modelConfig,
+        source: _PlaceholderHQSource(),
+      );
+
+      expect(result, isNull);
+    },
+  );
+
+  test(
+    'stream() returns null when no bootstrap/source is configured',
+    () async {
+      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+      final runtime = Runtime(
+        modelProvider: _StreamingModelProvider(),
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+      );
+
+      final result = await runtime.stream(['marketing'], modelConfig);
+
+      expect(result, isNull);
+    },
+  );
 }
