@@ -11,6 +11,7 @@ import 'package:pharos_ai_runtime/models/model_exception.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
+import 'package:pharos_ai_runtime/models/streaming_response.dart';
 import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
@@ -153,6 +154,20 @@ class Runtime {
     final response = await modelProvider.generate(request);
 
     return _pipeline.run(agent);
+  }
+
+  /// Builds a ModelRequest and delegates streaming execution to the
+  /// configured ModelProvider.
+  Future<StreamingResponse> stream(
+    EmployeeRuntime employee,
+    ModelConfig modelConfig,
+  ) async {
+    final request = _requestBuilder.build(
+      employee,
+      tools: _toolRegistry.definitions(),
+    );
+
+    return modelProvider.stream(request, modelConfig);
   }
 
   /// Internal streaming pipeline: ModelProvider.stream() ->

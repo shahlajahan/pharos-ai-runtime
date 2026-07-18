@@ -212,6 +212,7 @@ class _StreamingModelProvider extends ModelProvider {
   int streamCallCount = 0;
   ModelRequest? capturedStreamRequest;
   ModelConfig? capturedStreamModelConfig;
+  StreamingResponse? returnedStreamingResponse;
 
   @override
   Future<ModelResponse> generate(ModelRequest request) async =>
@@ -226,7 +227,10 @@ class _StreamingModelProvider extends ModelProvider {
     capturedStreamRequest = request;
     capturedStreamModelConfig = modelConfig;
 
-    return _FakeStreamingResponse(Stream.fromIterable(chunks));
+    final response = _FakeStreamingResponse(Stream.fromIterable(chunks));
+    returnedStreamingResponse = response;
+
+    return response;
   }
 }
 
@@ -1324,4 +1328,92 @@ void main() {
       expect(response.toolCalls, [toolCall]);
     },
   );
+
+  test('stream() delegates to modelProvider.stream() with a ModelRequest '
+      'reflecting the given employee and modelConfig', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const definition = ToolDefinition(
+      id: 'search',
+      description: 'Search the web.',
+    );
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [ModelResponseChunk(isFinished: true)];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      toolRegistry: const ToolRegistry(definitions: {'search': definition}),
+    );
+
+    await runtime.stream(employee, modelConfig);
+
+    expect(modelProvider.streamCallCount, 1);
+    expect(modelProvider.capturedStreamModelConfig, same(modelConfig));
+    expect(modelProvider.capturedStreamRequest!.tools, [definition]);
+  });
+
+  test('stream() returns the StreamingResponse from modelProvider.stream() '
+      'unchanged, without aggregating it', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [ModelResponseChunk(isFinished: true)];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+    );
+
+    final result = await runtime.stream(employee, modelConfig);
+
+    expect(result, same(modelProvider.returnedStreamingResponse));
+  });
+
+  test('stream() never executes any tool calls', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    final toolInvoker = _SpyToolInvoker();
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [
+        ModelResponseChunk(
+          toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+        ),
+        ModelResponseChunk(isFinished: true),
+      ];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      toolInvoker: toolInvoker,
+    );
+
+    await runtime.stream(employee, modelConfig);
+
+    expect(toolInvoker.invokedToolCalls, isEmpty);
+  });
 }
