@@ -164,7 +164,11 @@ class Runtime {
   ) async {
     final providerStream = await modelProvider.stream(request, modelConfig);
 
-    return _RuntimeStreamingResponse(providerStream, _toolInvoker);
+    return _RuntimeStreamingResponse(
+      providerStream,
+      _toolInvoker,
+      request.conversation,
+    );
   }
 
   /// Shared execution preparation for run() and stream(): validates args,
@@ -289,26 +293,38 @@ class _PreparedExecution {
 
 /// Runtime-owned StreamingResponse returned by [Runtime._streamPipeline].
 /// Forwards every chunk from the underlying provider StreamingResponse
-/// unchanged, while observing each chunk through a [ToolCallReconstructor]
-/// and executing each ToolCall via [ToolInvoker] as soon as it completes.
+/// unchanged, while observing each chunk through a [ToolCallReconstructor],
+/// executing each ToolCall via [ToolInvoker] as soon as it completes, and
+/// recording what happened as AssistantMessage/ToolMessage pairs appended
+/// to the Conversation the request was built from.
 class _RuntimeStreamingResponse implements StreamingResponse {
-  _RuntimeStreamingResponse(StreamingResponse source, ToolInvoker toolInvoker) {
+  _RuntimeStreamingResponse(
+    StreamingResponse source,
+    ToolInvoker toolInvoker,
+    Conversation initialConversation,
+  ) {
+    _messages.addAll(initialConversation.messages);
     stream = _forward(
       source,
       _reconstructor,
       toolInvoker,
       _toolOutputs,
+      _messages,
       _toolCallsCompleter,
       _toolOutputsCompleter,
+      _conversationCompleter,
     );
   }
 
   final ToolCallReconstructor _reconstructor = ToolCallReconstructor();
   final List<ToolOutput> _toolOutputs = [];
+  final List<Message> _messages = [];
   final Completer<List<ToolCall>> _toolCallsCompleter =
       Completer<List<ToolCall>>();
   final Completer<List<ToolOutput>> _toolOutputsCompleter =
       Completer<List<ToolOutput>>();
+  final Completer<Conversation> _conversationCompleter =
+      Completer<Conversation>();
 
   @override
   late final Stream<ModelResponseChunk> stream;
@@ -320,31 +336,38 @@ class _RuntimeStreamingResponse implements StreamingResponse {
       _toolCallsCompleter.future;
 
   /// Resolves once every reconstructed ToolCall has executed. Internal to
-  /// Runtime only — not part of the public StreamingResponse contract, and
-  /// not appended to any Conversation or sent in another request by this
-  /// task.
+  /// Runtime only — not part of the public StreamingResponse contract.
   Future<List<ToolOutput>> get toolOutputs => _toolOutputsCompleter.future;
+
+  /// Resolves once streaming ends, to the original Conversation extended
+  /// with one AssistantMessage/ToolMessage pair per executed ToolCall, in
+  /// execution order. Internal to Runtime only — not part of the public
+  /// StreamingResponse contract, and not sent in another request by this
+  /// task.
+  Future<Conversation> get conversation => _conversationCompleter.future;
 
   static Stream<ModelResponseChunk> _forward(
     StreamingResponse source,
     ToolCallReconstructor reconstructor,
     ToolInvoker toolInvoker,
     List<ToolOutput> toolOutputs,
+    List<Message> messages,
     Completer<List<ToolCall>> toolCallsCompleter,
     Completer<List<ToolOutput>> toolOutputsCompleter,
+    Completer<Conversation> conversationCompleter,
   ) async* {
     await for (final chunk in source.stream) {
       reconstructor.observe(chunk);
 
       for (final toolCall in reconstructor.drainCompleted()) {
-        toolOutputs.add(await _execute(toolInvoker, toolCall));
+        await _executeAndRecord(toolInvoker, toolCall, toolOutputs, messages);
       }
 
       yield chunk;
     }
 
     for (final toolCall in reconstructor.drainRemaining()) {
-      toolOutputs.add(await _execute(toolInvoker, toolCall));
+      await _executeAndRecord(toolInvoker, toolCall, toolOutputs, messages);
     }
 
     if (!toolCallsCompleter.isCompleted) {
@@ -354,19 +377,38 @@ class _RuntimeStreamingResponse implements StreamingResponse {
     if (!toolOutputsCompleter.isCompleted) {
       toolOutputsCompleter.complete(toolOutputs);
     }
+
+    if (!conversationCompleter.isCompleted) {
+      conversationCompleter.complete(
+        Conversation(messages: List.unmodifiable(messages)),
+      );
+    }
   }
 
-  static Future<ToolOutput> _execute(
+  static Future<void> _executeAndRecord(
     ToolInvoker toolInvoker,
     ToolCall toolCall,
+    List<ToolOutput> toolOutputs,
+    List<Message> messages,
   ) async {
     final result = await toolInvoker.invoke(toolCall);
 
-    return ToolOutput(
+    final output = ToolOutput(
       toolCallId: toolCall.id,
       toolName: toolCall.name,
       success: result.success,
       content: result.message,
+    );
+
+    toolOutputs.add(output);
+
+    messages.add(AssistantMessage(content: '', toolCalls: [toolCall]));
+    messages.add(
+      ToolMessage(
+        toolCallId: output.toolCallId,
+        toolName: output.toolName,
+        content: output.content,
+      ),
     );
   }
 }

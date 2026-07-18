@@ -1584,6 +1584,81 @@ void main() {
     },
   );
 
+  test(
+    'stream() records each executed ToolCall as an AssistantMessage/'
+    'ToolMessage pair in the internal Conversation, in execution order',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+      final toolInvoker = _SpyToolInvoker();
+      final modelProvider = _StreamingModelProvider()
+        ..chunks = const [
+          ModelResponseChunk(
+            toolCalls: [
+              ToolCall(id: 'call_1', name: 'search', arguments: '{}'),
+            ],
+          ),
+          ModelResponseChunk(
+            toolCalls: [
+              ToolCall(id: 'call_2', name: 'calculator', arguments: '{}'),
+            ],
+          ),
+          ModelResponseChunk(isFinished: true),
+        ];
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+        toolInvoker: toolInvoker,
+      );
+
+      final result = await runtime.stream(
+        ['marketing'],
+        modelConfig,
+        source: _PlaceholderHQSource(),
+      );
+      await result!.stream.toList();
+
+      // Reaches the Runtime-internal conversation getter dynamically: the
+      // concrete StreamingResponse type is private (not part of the public
+      // API), but its public-named `conversation` member is still
+      // reachable via dynamic dispatch, which is how this internal-only
+      // state is verified without exposing it through any public API.
+      final conversation = await (result as dynamic).conversation;
+      final originalLength = DefaultRuntimeRequestBuilder()
+          .build(employee)
+          .conversation
+          .messages
+          .length;
+      final appended = conversation.messages.sublist(originalLength);
+
+      expect(appended, hasLength(4));
+
+      expect(appended[0], isA<AssistantMessage>());
+      expect((appended[0] as AssistantMessage).toolCalls.map((c) => c.id), [
+        'call_1',
+      ]);
+      expect(appended[1], isA<ToolMessage>());
+      expect((appended[1] as ToolMessage).toolCallId, 'call_1');
+
+      expect(appended[2], isA<AssistantMessage>());
+      expect((appended[2] as AssistantMessage).toolCalls.map((c) => c.id), [
+        'call_2',
+      ]);
+      expect(appended[3], isA<ToolMessage>());
+      expect((appended[3] as ToolMessage).toolCallId, 'call_2');
+    },
+  );
+
   test('stream() does not mutate the Conversation after streaming begins: the '
       'request sent to the provider contains exactly the messages '
       'RuntimeRequestBuilder produced', () async {
