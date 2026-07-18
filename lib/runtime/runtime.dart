@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:pharos_ai_runtime/runtime/agent_registry.dart';
 import 'package:pharos_ai_runtime/runtime/execution_pipeline.dart';
 import 'package:pharos_ai_runtime/core/agent.dart';
@@ -17,6 +19,8 @@ import 'package:pharos_ai_runtime/runtime/employee_response_handler.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
 import 'package:pharos_ai_runtime/runtime/runtime_request_builder.dart';
 import 'package:pharos_ai_runtime/runtime/streaming_response_aggregator.dart';
+import 'package:pharos_ai_runtime/runtime/tool_call_reconstructor.dart';
+import 'package:pharos_ai_runtime/tooling/tool_call.dart';
 import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
@@ -285,17 +289,40 @@ class _PreparedExecution {
 
 /// Runtime-owned StreamingResponse returned by [Runtime._streamPipeline].
 /// Forwards every chunk from the underlying provider StreamingResponse
-/// unchanged.
+/// unchanged, while observing each chunk through a [ToolCallReconstructor]
+/// to reconstruct complete ToolCalls for internal Runtime use.
 class _RuntimeStreamingResponse implements StreamingResponse {
-  _RuntimeStreamingResponse(StreamingResponse source)
-    : stream = _forward(source);
+  _RuntimeStreamingResponse(StreamingResponse source) {
+    stream = _forward(source, _reconstructor, _toolCallsCompleter);
+  }
+
+  final ToolCallReconstructor _reconstructor = ToolCallReconstructor();
+  final Completer<List<ToolCall>> _toolCallsCompleter =
+      Completer<List<ToolCall>>();
 
   @override
-  final Stream<ModelResponseChunk> stream;
+  late final Stream<ModelResponseChunk> stream;
 
-  static Stream<ModelResponseChunk> _forward(StreamingResponse source) async* {
+  /// Resolves once the provider stream has been fully observed, with every
+  /// ToolCall fragment merged into its complete form. Internal to Runtime
+  /// only — not part of the public StreamingResponse contract, and not
+  /// executed, appended to any Conversation, or sent in another request by
+  /// this task.
+  Future<List<ToolCall>> get reconstructedToolCalls =>
+      _toolCallsCompleter.future;
+
+  static Stream<ModelResponseChunk> _forward(
+    StreamingResponse source,
+    ToolCallReconstructor reconstructor,
+    Completer<List<ToolCall>> toolCallsCompleter,
+  ) async* {
     await for (final chunk in source.stream) {
+      reconstructor.observe(chunk);
       yield chunk;
+    }
+
+    if (!toolCallsCompleter.isCompleted) {
+      toolCallsCompleter.complete(reconstructor.complete());
     }
   }
 }
