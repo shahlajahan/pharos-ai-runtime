@@ -154,17 +154,17 @@ class Runtime {
   }
 
   /// Internal Runtime streaming pipeline: calls ModelProvider.stream() and
-  /// wraps the result in a Runtime-owned StreamingResponse. For now this is
-  /// a transparent pass-through — every chunk is forwarded unchanged — but
-  /// it is the seam future tasks will use to intercept ToolCalls without
-  /// changing stream()'s public contract.
+  /// wraps the result in a Runtime-owned StreamingResponse. Every chunk is
+  /// forwarded unchanged; ToolCalls are reconstructed and executed
+  /// internally as they complete, without changing stream()'s public
+  /// contract.
   Future<StreamingResponse> _streamPipeline(
     ModelRequest request,
     ModelConfig modelConfig,
   ) async {
     final providerStream = await modelProvider.stream(request, modelConfig);
 
-    return _RuntimeStreamingResponse(providerStream);
+    return _RuntimeStreamingResponse(providerStream, _toolInvoker);
   }
 
   /// Shared execution preparation for run() and stream(): validates args,
@@ -290,39 +290,83 @@ class _PreparedExecution {
 /// Runtime-owned StreamingResponse returned by [Runtime._streamPipeline].
 /// Forwards every chunk from the underlying provider StreamingResponse
 /// unchanged, while observing each chunk through a [ToolCallReconstructor]
-/// to reconstruct complete ToolCalls for internal Runtime use.
+/// and executing each ToolCall via [ToolInvoker] as soon as it completes.
 class _RuntimeStreamingResponse implements StreamingResponse {
-  _RuntimeStreamingResponse(StreamingResponse source) {
-    stream = _forward(source, _reconstructor, _toolCallsCompleter);
+  _RuntimeStreamingResponse(StreamingResponse source, ToolInvoker toolInvoker) {
+    stream = _forward(
+      source,
+      _reconstructor,
+      toolInvoker,
+      _toolOutputs,
+      _toolCallsCompleter,
+      _toolOutputsCompleter,
+    );
   }
 
   final ToolCallReconstructor _reconstructor = ToolCallReconstructor();
+  final List<ToolOutput> _toolOutputs = [];
   final Completer<List<ToolCall>> _toolCallsCompleter =
       Completer<List<ToolCall>>();
+  final Completer<List<ToolOutput>> _toolOutputsCompleter =
+      Completer<List<ToolOutput>>();
 
   @override
   late final Stream<ModelResponseChunk> stream;
 
   /// Resolves once the provider stream has been fully observed, with every
   /// ToolCall fragment merged into its complete form. Internal to Runtime
-  /// only — not part of the public StreamingResponse contract, and not
-  /// executed, appended to any Conversation, or sent in another request by
-  /// this task.
+  /// only — not part of the public StreamingResponse contract.
   Future<List<ToolCall>> get reconstructedToolCalls =>
       _toolCallsCompleter.future;
+
+  /// Resolves once every reconstructed ToolCall has executed. Internal to
+  /// Runtime only — not part of the public StreamingResponse contract, and
+  /// not appended to any Conversation or sent in another request by this
+  /// task.
+  Future<List<ToolOutput>> get toolOutputs => _toolOutputsCompleter.future;
 
   static Stream<ModelResponseChunk> _forward(
     StreamingResponse source,
     ToolCallReconstructor reconstructor,
+    ToolInvoker toolInvoker,
+    List<ToolOutput> toolOutputs,
     Completer<List<ToolCall>> toolCallsCompleter,
+    Completer<List<ToolOutput>> toolOutputsCompleter,
   ) async* {
     await for (final chunk in source.stream) {
       reconstructor.observe(chunk);
+
+      for (final toolCall in reconstructor.drainCompleted()) {
+        toolOutputs.add(await _execute(toolInvoker, toolCall));
+      }
+
       yield chunk;
+    }
+
+    for (final toolCall in reconstructor.drainRemaining()) {
+      toolOutputs.add(await _execute(toolInvoker, toolCall));
     }
 
     if (!toolCallsCompleter.isCompleted) {
       toolCallsCompleter.complete(reconstructor.complete());
     }
+
+    if (!toolOutputsCompleter.isCompleted) {
+      toolOutputsCompleter.complete(toolOutputs);
+    }
+  }
+
+  static Future<ToolOutput> _execute(
+    ToolInvoker toolInvoker,
+    ToolCall toolCall,
+  ) async {
+    final result = await toolInvoker.invoke(toolCall);
+
+    return ToolOutput(
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      success: result.success,
+      content: result.message,
+    );
   }
 }

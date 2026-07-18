@@ -13,6 +13,7 @@ class ToolCallReconstructor {
   final List<String> _order = [];
   final Map<String, StringBuffer> _arguments = {};
   final Map<String, String> _names = {};
+  final Set<String> _drained = {};
   String? _lastId;
 
   void observe(ModelResponseChunk chunk) {
@@ -56,5 +57,45 @@ class ToolCallReconstructor {
           arguments: _arguments[id]!.toString(),
         ),
     ];
+  }
+
+  /// Returns ToolCalls that have become complete since the last call to
+  /// [drainCompleted] or [drainRemaining] — every reconstructed id except
+  /// the one still in progress ([_lastId]), that hasn't already been
+  /// drained. A ToolCall becomes complete as soon as a fragment for a
+  /// different, new id arrives, since fragments never resume for an id
+  /// once a later one has started.
+  List<ToolCall> drainCompleted() {
+    final completedIds = [
+      for (final id in _order)
+        if (id != _lastId && !_drained.contains(id)) id,
+    ];
+
+    _drained.addAll(completedIds);
+
+    return [for (final id in completedIds) _toolCall(id)];
+  }
+
+  /// Call once the stream has ended: returns the still in-progress ToolCall
+  /// (if any, and if not already drained), since no further fragments will
+  /// arrive for it.
+  List<ToolCall> drainRemaining() {
+    final id = _lastId;
+
+    if (id == null || _drained.contains(id)) {
+      return const [];
+    }
+
+    _drained.add(id);
+
+    return [_toolCall(id)];
+  }
+
+  ToolCall _toolCall(String id) {
+    return ToolCall(
+      id: id,
+      name: _names[id] ?? '',
+      arguments: _arguments[id]!.toString(),
+    );
   }
 }

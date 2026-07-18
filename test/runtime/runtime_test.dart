@@ -1449,7 +1449,8 @@ void main() {
     }
   });
 
-  test('stream() never executes any tool calls', () async {
+  test('stream() does not execute any tool calls until the returned stream is '
+      'consumed', () async {
     const employee = EmployeeRuntime(
       definition: EmployeeDefinition(
         id: 'marketing',
@@ -1484,6 +1485,104 @@ void main() {
 
     expect(toolInvoker.invokedToolCalls, isEmpty);
   });
+
+  test('stream() executes a completed ToolCall exactly once while the '
+      'returned stream is consumed, forwarding chunks unchanged', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    const toolCall = ToolCall(
+      id: 'call_1',
+      name: 'search',
+      arguments: '{"q":"hi"}',
+    );
+    final toolInvoker = _SpyToolInvoker();
+    const providerChunks = [
+      ModelResponseChunk(toolCalls: [toolCall]),
+      ModelResponseChunk(isFinished: true),
+    ];
+    final modelProvider = _StreamingModelProvider()..chunks = providerChunks;
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+      toolInvoker: toolInvoker,
+    );
+
+    final result = await runtime.stream(
+      ['marketing'],
+      modelConfig,
+      source: _PlaceholderHQSource(),
+    );
+    final forwardedChunks = await result!.stream.toList();
+
+    expect(toolInvoker.invokedToolCalls, hasLength(1));
+    expect(toolInvoker.invokedToolCalls[0].id, 'call_1');
+    expect(toolInvoker.invokedToolCalls[0].arguments, '{"q":"hi"}');
+    expect(forwardedChunks, hasLength(providerChunks.length));
+
+    for (var i = 0; i < providerChunks.length; i++) {
+      expect(forwardedChunks[i].isFinished, providerChunks[i].isFinished);
+    }
+  });
+
+  test(
+    'stream() executes each of multiple completed ToolCalls exactly once',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+      final toolInvoker = _SpyToolInvoker();
+      final modelProvider = _StreamingModelProvider()
+        ..chunks = const [
+          ModelResponseChunk(
+            toolCalls: [
+              ToolCall(id: 'call_1', name: 'search', arguments: '{}'),
+            ],
+          ),
+          ModelResponseChunk(
+            toolCalls: [
+              ToolCall(id: 'call_2', name: 'calculator', arguments: '{}'),
+            ],
+          ),
+          ModelResponseChunk(isFinished: true),
+        ];
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+        toolInvoker: toolInvoker,
+      );
+
+      final result = await runtime.stream(
+        ['marketing'],
+        modelConfig,
+        source: _PlaceholderHQSource(),
+      );
+      await result!.stream.toList();
+
+      expect(toolInvoker.invokedToolCalls.map((c) => c.id), [
+        'call_1',
+        'call_2',
+      ]);
+    },
+  );
 
   test('stream() does not mutate the Conversation after streaming begins: the '
       'request sent to the provider contains exactly the messages '

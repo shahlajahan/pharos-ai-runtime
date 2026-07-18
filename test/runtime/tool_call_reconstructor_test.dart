@@ -173,4 +173,128 @@ void main() {
     expect(result[1].id, 'call_2');
     expect(result[1].arguments, 'xy');
   });
+
+  test('drainCompleted() returns nothing while only one ToolCall is in '
+      'progress', () {
+    final reconstructor = ToolCallReconstructor();
+
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{')],
+      ),
+    );
+
+    expect(reconstructor.drainCompleted(), isEmpty);
+
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [ToolCall(id: '', name: '', arguments: '}')],
+      ),
+    );
+
+    expect(reconstructor.drainCompleted(), isEmpty);
+  });
+
+  test('drainCompleted() returns a ToolCall as soon as a fragment for a new '
+      'id arrives', () {
+    final reconstructor = ToolCallReconstructor();
+
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [
+          ToolCall(id: 'call_1', name: 'search', arguments: '{"q":"hi"}'),
+        ],
+      ),
+    );
+
+    expect(reconstructor.drainCompleted(), isEmpty);
+
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [
+          ToolCall(id: 'call_2', name: 'calculator', arguments: '{"x":1}'),
+        ],
+      ),
+    );
+
+    final completed = reconstructor.drainCompleted();
+
+    expect(completed, hasLength(1));
+    expect(completed[0].id, 'call_1');
+    expect(completed[0].name, 'search');
+    expect(completed[0].arguments, '{"q":"hi"}');
+  });
+
+  test('drainCompleted() never returns the same ToolCall twice', () {
+    final reconstructor = ToolCallReconstructor();
+
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+      ),
+    );
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [
+          ToolCall(id: 'call_2', name: 'calculator', arguments: '{}'),
+        ],
+      ),
+    );
+
+    expect(reconstructor.drainCompleted(), hasLength(1));
+    expect(reconstructor.drainCompleted(), isEmpty);
+  });
+
+  test('drainRemaining() returns the still in-progress ToolCall once the '
+      'stream ends', () {
+    final reconstructor = ToolCallReconstructor();
+
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [
+          ToolCall(id: 'call_1', name: 'search', arguments: '{"q":"hi"}'),
+        ],
+      ),
+    );
+
+    expect(reconstructor.drainCompleted(), isEmpty);
+
+    final remaining = reconstructor.drainRemaining();
+
+    expect(remaining, hasLength(1));
+    expect(remaining[0].id, 'call_1');
+    expect(remaining[0].arguments, '{"q":"hi"}');
+  });
+
+  test('drainRemaining() returns nothing when nothing was observed', () {
+    final reconstructor = ToolCallReconstructor();
+
+    expect(reconstructor.drainRemaining(), isEmpty);
+  });
+
+  test('drainCompleted() then drainRemaining() together execute every '
+      'ToolCall exactly once', () {
+    final reconstructor = ToolCallReconstructor();
+
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+      ),
+    );
+    final firstDrain = reconstructor.drainCompleted();
+
+    reconstructor.observe(
+      const ModelResponseChunk(
+        toolCalls: [
+          ToolCall(id: 'call_2', name: 'calculator', arguments: '{}'),
+        ],
+      ),
+    );
+    final secondDrain = reconstructor.drainCompleted();
+    final remaining = reconstructor.drainRemaining();
+
+    expect(firstDrain, isEmpty);
+    expect(secondDrain.map((c) => c.id), ['call_1']);
+    expect(remaining.map((c) => c.id), ['call_2']);
+  });
 }
