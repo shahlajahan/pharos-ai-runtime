@@ -156,8 +156,10 @@ class Runtime {
   /// Internal Runtime streaming pipeline: calls ModelProvider.stream() and
   /// wraps the result in a Runtime-owned StreamingResponse. Every chunk is
   /// forwarded unchanged; ToolCalls are reconstructed and executed
-  /// internally as they complete, without changing stream()'s public
-  /// contract.
+  /// internally as they complete. If any ToolCalls were executed, one
+  /// follow-up ModelProvider.stream() call continues generation with the
+  /// updated Conversation, and its chunks are forwarded as part of the same
+  /// continuous stream — without changing stream()'s public contract.
   Future<StreamingResponse> _streamPipeline(
     ModelRequest request,
     ModelConfig modelConfig,
@@ -166,8 +168,10 @@ class Runtime {
 
     return _RuntimeStreamingResponse(
       providerStream,
+      modelProvider,
       _toolInvoker,
-      request.conversation,
+      request,
+      modelConfig,
     );
   }
 
@@ -296,18 +300,28 @@ class _PreparedExecution {
 /// unchanged, while observing each chunk through a [ToolCallReconstructor],
 /// executing each ToolCall via [ToolInvoker] as soon as it completes, and
 /// recording what happened as AssistantMessage/ToolMessage pairs appended
-/// to the Conversation the request was built from.
+/// to the Conversation the request was built from. If any ToolCalls were
+/// executed once the first provider stream ends, one follow-up
+/// ModelProvider.stream() call continues generation with the updated
+/// Conversation, and its chunks are forwarded as part of the same
+/// continuous stream — with no further ToolCall processing, so at most one
+/// additional model request is ever made.
 class _RuntimeStreamingResponse implements StreamingResponse {
   _RuntimeStreamingResponse(
     StreamingResponse source,
+    ModelProvider modelProvider,
     ToolInvoker toolInvoker,
-    Conversation initialConversation,
+    ModelRequest request,
+    ModelConfig modelConfig,
   ) {
-    _messages.addAll(initialConversation.messages);
+    _messages.addAll(request.conversation.messages);
     stream = _forward(
       source,
       _reconstructor,
+      modelProvider,
       toolInvoker,
+      request,
+      modelConfig,
       _toolOutputs,
       _messages,
       _toolCallsCompleter,
@@ -329,9 +343,9 @@ class _RuntimeStreamingResponse implements StreamingResponse {
   @override
   late final Stream<ModelResponseChunk> stream;
 
-  /// Resolves once the provider stream has been fully observed, with every
-  /// ToolCall fragment merged into its complete form. Internal to Runtime
-  /// only — not part of the public StreamingResponse contract.
+  /// Resolves once the first provider stream has been fully observed, with
+  /// every ToolCall fragment merged into its complete form. Internal to
+  /// Runtime only — not part of the public StreamingResponse contract.
   Future<List<ToolCall>> get reconstructedToolCalls =>
       _toolCallsCompleter.future;
 
@@ -339,17 +353,19 @@ class _RuntimeStreamingResponse implements StreamingResponse {
   /// Runtime only — not part of the public StreamingResponse contract.
   Future<List<ToolOutput>> get toolOutputs => _toolOutputsCompleter.future;
 
-  /// Resolves once streaming ends, to the original Conversation extended
-  /// with one AssistantMessage/ToolMessage pair per executed ToolCall, in
-  /// execution order. Internal to Runtime only — not part of the public
-  /// StreamingResponse contract, and not sent in another request by this
-  /// task.
+  /// Resolves once the first provider stream ends, to the original
+  /// Conversation extended with one AssistantMessage/ToolMessage pair per
+  /// executed ToolCall, in execution order. Internal to Runtime only — not
+  /// part of the public StreamingResponse contract.
   Future<Conversation> get conversation => _conversationCompleter.future;
 
   static Stream<ModelResponseChunk> _forward(
     StreamingResponse source,
     ToolCallReconstructor reconstructor,
+    ModelProvider modelProvider,
     ToolInvoker toolInvoker,
+    ModelRequest request,
+    ModelConfig modelConfig,
     List<ToolOutput> toolOutputs,
     List<Message> messages,
     Completer<List<ToolCall>> toolCallsCompleter,
@@ -383,6 +399,22 @@ class _RuntimeStreamingResponse implements StreamingResponse {
         Conversation(messages: List.unmodifiable(messages)),
       );
     }
+
+    if (toolOutputs.isEmpty) {
+      return;
+    }
+
+    final secondRequest = ModelRequest(
+      conversation: Conversation(messages: List.unmodifiable(messages)),
+      tools: request.tools,
+    );
+
+    final secondProviderStream = await modelProvider.stream(
+      secondRequest,
+      modelConfig,
+    );
+
+    yield* secondProviderStream.stream;
   }
 
   static Future<void> _executeAndRecord(

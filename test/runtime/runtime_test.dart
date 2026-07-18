@@ -209,8 +209,13 @@ class _FakeStreamingResponse implements StreamingResponse {
 class _StreamingModelProvider extends ModelProvider {
   ModelResponse generateResponse = const ModelResponse(text: 'ok');
   List<ModelResponseChunk> chunks = const [];
+  // Returned by the second stream() call (the streaming Tool-loop
+  // follow-up request), if one is made. Defaults to empty so existing
+  // single-round tests are unaffected unless they opt in.
+  List<ModelResponseChunk> secondChunks = const [];
   int streamCallCount = 0;
   ModelRequest? capturedStreamRequest;
+  final List<ModelRequest> capturedStreamRequests = [];
   ModelConfig? capturedStreamModelConfig;
   StreamingResponse? returnedStreamingResponse;
 
@@ -225,9 +230,13 @@ class _StreamingModelProvider extends ModelProvider {
   ) async {
     streamCallCount++;
     capturedStreamRequest = request;
+    capturedStreamRequests.add(request);
     capturedStreamModelConfig = modelConfig;
 
-    final response = _FakeStreamingResponse(Stream.fromIterable(chunks));
+    final chunksForThisCall = streamCallCount == 1 ? chunks : secondChunks;
+    final response = _FakeStreamingResponse(
+      Stream.fromIterable(chunksForThisCall),
+    );
     returnedStreamingResponse = response;
 
     return response;
@@ -1746,4 +1755,113 @@ void main() {
       expect(result, isNull);
     },
   );
+
+  test(
+    'stream() makes no follow-up request when no ToolCalls occurred',
+    () async {
+      const employee = EmployeeRuntime(
+        definition: EmployeeDefinition(
+          id: 'marketing',
+          name: 'Marketing Employee',
+          role: 'Marketing',
+        ),
+        knowledge: [],
+        prompts: [],
+      );
+      const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+      final modelProvider = _StreamingModelProvider()
+        ..chunks = const [
+          ModelResponseChunk(textDelta: 'Hello'),
+          ModelResponseChunk(isFinished: true),
+        ];
+      final runtime = Runtime(
+        modelProvider: modelProvider,
+        requestBuilder: DefaultRuntimeRequestBuilder(),
+        responseHandler: DefaultEmployeeResponseHandler(),
+        bootstrap: _StubHQBootstrap([employee]),
+      );
+
+      final result = await runtime.stream(
+        ['marketing'],
+        modelConfig,
+        source: _PlaceholderHQSource(),
+      );
+      await result!.stream.toList();
+
+      expect(modelProvider.streamCallCount, 1);
+    },
+  );
+
+  test('stream() makes exactly one follow-up request when a ToolCall '
+      'executed, using the updated Conversation, and forwards both provider '
+      'streams as one continuous stream', () async {
+    const employee = EmployeeRuntime(
+      definition: EmployeeDefinition(
+        id: 'marketing',
+        name: 'Marketing Employee',
+        role: 'Marketing',
+      ),
+      knowledge: [],
+      prompts: [],
+    );
+    const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
+    final toolInvoker = _SpyToolInvoker();
+    final modelProvider = _StreamingModelProvider()
+      ..chunks = const [
+        ModelResponseChunk(
+          toolCalls: [ToolCall(id: 'call_1', name: 'search', arguments: '{}')],
+        ),
+        ModelResponseChunk(isFinished: true),
+      ]
+      ..secondChunks = const [
+        ModelResponseChunk(textDelta: 'final answer'),
+        ModelResponseChunk(isFinished: true),
+      ];
+    final runtime = Runtime(
+      modelProvider: modelProvider,
+      requestBuilder: DefaultRuntimeRequestBuilder(),
+      responseHandler: DefaultEmployeeResponseHandler(),
+      bootstrap: _StubHQBootstrap([employee]),
+      toolInvoker: toolInvoker,
+    );
+
+    final result = await runtime.stream(
+      ['marketing'],
+      modelConfig,
+      source: _PlaceholderHQSource(),
+    );
+    final forwardedChunks = await result!.stream.toList();
+
+    expect(modelProvider.streamCallCount, 2);
+
+    // One continuous stream: the first round's 2 chunks followed by the
+    // second round's 2 chunks, in order.
+    expect(forwardedChunks, hasLength(4));
+    expect(forwardedChunks[0].toolCalls, hasLength(1));
+    expect(forwardedChunks[1].isFinished, isTrue);
+    expect(forwardedChunks[2].textDelta, 'final answer');
+    expect(forwardedChunks[3].isFinished, isTrue);
+
+    // The follow-up request is built from the updated Conversation: the
+    // original messages plus the AssistantMessage/ToolMessage pair
+    // recorded for the executed ToolCall.
+    final firstRequest = modelProvider.capturedStreamRequests[0];
+    final secondRequest = modelProvider.capturedStreamRequests[1];
+    final originalLength = firstRequest.conversation.messages.length;
+    final appended = secondRequest.conversation.messages.sublist(
+      originalLength,
+    );
+
+    expect(
+      secondRequest.conversation.messages.sublist(0, originalLength),
+      orderedEquals(firstRequest.conversation.messages),
+    );
+    expect(appended, hasLength(2));
+    expect(appended[0], isA<AssistantMessage>());
+    expect((appended[0] as AssistantMessage).toolCalls.map((c) => c.id), [
+      'call_1',
+    ]);
+    expect(appended[1], isA<ToolMessage>());
+    expect((appended[1] as ToolMessage).toolCallId, 'call_1');
+  });
 }
