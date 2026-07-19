@@ -1,4 +1,8 @@
 import 'package:pharos_ai_runtime/company/company.dart';
+import 'package:pharos_ai_runtime/company/identity/company_configuration.dart';
+import 'package:pharos_ai_runtime/company/identity/company_identity.dart';
+import 'package:pharos_ai_runtime/company/identity/company_locale.dart';
+import 'package:pharos_ai_runtime/company/identity/company_location.dart';
 import 'package:pharos_ai_runtime/company/knowledge/knowledge.dart';
 import 'package:pharos_ai_runtime/company/metrics/metrics.dart';
 import 'package:pharos_ai_runtime/company/organization/organization.dart';
@@ -30,6 +34,20 @@ void main() {
       'Company? and save(Company)', () async {
     final repository = _FakeCompanyRepository();
     const company = Company(
+      identity: CompanyIdentity(
+        id: 'pharos',
+        displayName: 'Pharos',
+        legalName: 'Pharos Inc.',
+      ),
+      configuration: CompanyConfiguration(
+        locale: CompanyLocale(
+          languageCode: 'en',
+          countryCode: 'US',
+          timeZone: 'UTC',
+          currencyCode: 'USD',
+        ),
+        location: CompanyLocation(country: 'USA', region: 'CA', city: 'SF'),
+      ),
       organization: Organization(departments: []),
       portfolio: Portfolio(products: [], projects: []),
       resources: Resources(

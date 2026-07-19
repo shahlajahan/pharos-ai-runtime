@@ -1,4 +1,8 @@
 import 'package:pharos_ai_runtime/company/company.dart';
+import 'package:pharos_ai_runtime/company/identity/company_configuration.dart';
+import 'package:pharos_ai_runtime/company/identity/company_identity.dart';
+import 'package:pharos_ai_runtime/company/identity/company_locale.dart';
+import 'package:pharos_ai_runtime/company/identity/company_location.dart';
 import 'package:pharos_ai_runtime/company/knowledge/knowledge.dart';
 import 'package:pharos_ai_runtime/company/metrics/metrics.dart';
 import 'package:pharos_ai_runtime/company/organization/organization.dart';
@@ -21,7 +25,23 @@ const _resources = Resources(
   apiUsage: ApiUsage(),
 );
 
+const _configuration = CompanyConfiguration(
+  locale: CompanyLocale(
+    languageCode: 'en',
+    countryCode: 'US',
+    timeZone: 'UTC',
+    currencyCode: 'USD',
+  ),
+  location: CompanyLocation(country: 'USA', region: 'CA', city: 'SF'),
+);
+
 Company _company() => const Company(
+  identity: CompanyIdentity(
+    id: 'pharos',
+    displayName: 'Pharos',
+    legalName: 'Pharos Inc.',
+  ),
+  configuration: _configuration,
   organization: Organization(departments: []),
   portfolio: Portfolio(products: [], projects: []),
   resources: _resources,
@@ -32,6 +52,21 @@ Company _company() => const Company(
 void main() {
   test('Company can be instantiated', () {
     expect(_company(), isNotNull);
+  });
+
+  test('Company exposes Identity', () {
+    final company = _company();
+
+    expect(company.identity, isA<CompanyIdentity>());
+    expect(company.identity.id, 'pharos');
+  });
+
+  test('Company exposes Configuration', () {
+    final company = _company();
+
+    expect(company.configuration, isA<CompanyConfiguration>());
+    expect(company.configuration.locale, isA<CompanyLocale>());
+    expect(company.configuration.location, isA<CompanyLocation>());
   });
 
   test('Company exposes Organization, Portfolio, Resources, Knowledge, and '
