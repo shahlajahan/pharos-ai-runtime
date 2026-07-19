@@ -1,3 +1,4 @@
+import 'package:pharos_ai_runtime/company/governance/company_governance.dart';
 import 'package:pharos_ai_runtime/company/identity/company_configuration.dart';
 import 'package:pharos_ai_runtime/company/identity/company_identity.dart';
 import 'package:pharos_ai_runtime/company/knowledge/knowledge.dart';
@@ -18,6 +19,7 @@ class Company {
   const Company({
     required this.identity,
     required this.configuration,
+    required this.governance,
     required this.organization,
     required this.portfolio,
     required this.resources,
@@ -27,6 +29,7 @@ class Company {
 
   final CompanyIdentity identity;
   final CompanyConfiguration configuration;
+  final CompanyGovernance governance;
   final Organization organization;
   final Portfolio portfolio;
   final Resources resources;

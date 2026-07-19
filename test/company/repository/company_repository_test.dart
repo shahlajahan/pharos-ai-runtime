@@ -1,4 +1,8 @@
 import 'package:pharos_ai_runtime/company/company.dart';
+import 'package:pharos_ai_runtime/company/departments/finance_department.dart';
+import 'package:pharos_ai_runtime/company/governance/budget_area.dart';
+import 'package:pharos_ai_runtime/company/governance/company_governance.dart';
+import 'package:pharos_ai_runtime/company/governance/ownership.dart';
 import 'package:pharos_ai_runtime/company/identity/company_configuration.dart';
 import 'package:pharos_ai_runtime/company/identity/company_identity.dart';
 import 'package:pharos_ai_runtime/company/identity/company_locale.dart';
@@ -47,6 +51,14 @@ void main() {
           currencyCode: 'USD',
         ),
         location: CompanyLocation(country: 'USA', region: 'CA', city: 'SF'),
+      ),
+      governance: CompanyGovernance(
+        ownerships: [
+          Ownership(
+            businessArea: BudgetArea(),
+            department: FinanceDepartment(),
+          ),
+        ],
       ),
       organization: Organization(departments: []),
       portfolio: Portfolio(products: [], projects: []),
