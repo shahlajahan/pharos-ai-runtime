@@ -1,4 +1,5 @@
 import 'package:pharos_ai_runtime/runtime/intent/runtime_intent.dart';
+import 'package:pharos_ai_runtime/runtime/plan/runtime_plan.dart';
 import 'package:pharos_ai_runtime/runtime/planning/planning_request.dart';
 import 'package:pharos_ai_runtime/runtime/planning/planning_result.dart';
 import 'package:pharos_ai_runtime/runtime/planning/runtime_planner.dart';
@@ -15,7 +16,9 @@ class _FakeRuntimeIntent implements RuntimeIntent {
 class _FakeRuntimePlanner implements RuntimePlanner {
   @override
   Future<PlanningResult> plan(PlanningRequest request) async {
-    return const PlanningResult();
+    return const PlanningResult(
+      plan: RuntimePlan(id: 'p1', title: 'Ship the release'),
+    );
   }
 }
 
