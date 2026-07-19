@@ -9,6 +9,7 @@ import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:pharos_ai_runtime/tooling/delegate_employee_tool.dart';
 import 'package:pharos_ai_runtime/tooling/tool_context.dart';
+import 'package:pharos_ai_runtime/workflow/workflow_context.dart';
 import 'package:test/test.dart';
 
 class _FakeHQSource extends HQSource {
@@ -46,6 +47,7 @@ class _SpyHQ extends HQ {
     required String employee,
     required String goal,
     ConversationMemory? memory,
+    WorkflowContext? context,
   }) async {
     callCount++;
     capturedEmployee = employee;
@@ -70,6 +72,7 @@ class _NestedDelegationHQ extends HQ {
     required String employee,
     required String goal,
     ConversationMemory? memory,
+    WorkflowContext? context,
   }) {
     // Simulates the delegated Employee's own tool-calling loop invoking
     // delegate_employee again before this outer call has returned.

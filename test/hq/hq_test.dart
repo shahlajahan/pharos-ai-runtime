@@ -10,7 +10,10 @@ import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/models/model_response.dart';
+import 'package:pharos_ai_runtime/planner/plan_step.dart';
 import 'package:pharos_ai_runtime/runtime/employee_runtime.dart';
+import 'package:pharos_ai_runtime/workflow/workflow_context.dart';
+import 'package:pharos_ai_runtime/workflow/workflow_step_result.dart';
 import 'package:test/test.dart';
 
 class _FakeHQSource extends HQSource {
@@ -375,4 +378,78 @@ void main() {
       );
     },
   );
+
+  test('invoke() without a context sends the bare goal, exactly as before '
+      'WorkflowContext existed', () async {
+    final modelProvider = _SpyModelProvider();
+    final hq = HQ(
+      modelProvider: modelProvider,
+      bootstrap: _FakeHQBootstrapper([employee]),
+      source: _FakeHQSource(),
+    );
+
+    await hq.invoke(employee: 'marketing', goal: 'Review architecture');
+
+    final userMessage = modelProvider.capturedRequest!.conversation.messages
+        .whereType<UserMessage>()
+        .single;
+    expect(userMessage.content, 'Review architecture');
+  });
+
+  test('invoke() with a context that has no previousSteps sends the bare '
+      'goal, unchanged', () async {
+    final modelProvider = _SpyModelProvider();
+    final hq = HQ(
+      modelProvider: modelProvider,
+      bootstrap: _FakeHQBootstrapper([employee]),
+      source: _FakeHQSource(),
+    );
+
+    await hq.invoke(
+      employee: 'marketing',
+      goal: 'Review architecture',
+      context: const WorkflowContext(previousSteps: []),
+    );
+
+    final userMessage = modelProvider.capturedRequest!.conversation.messages
+        .whereType<UserMessage>()
+        .single;
+    expect(userMessage.content, 'Review architecture');
+  });
+
+  test('invoke() with a context carrying previousSteps prepends a '
+      'deterministic "Previous Workflow Results" summary before "Current '
+      'Goal" and the goal itself', () async {
+    final modelProvider = _SpyModelProvider();
+    final hq = HQ(
+      modelProvider: modelProvider,
+      bootstrap: _FakeHQBootstrapper([employee]),
+      source: _FakeHQSource(),
+    );
+    final context = WorkflowContext(
+      previousSteps: [
+        WorkflowStepResult(
+          step: const PlanStep(
+            description: 'Research competitors',
+            assignedEmployee: 'research',
+          ),
+          result: Result.success('Competitor research complete.'),
+        ),
+      ],
+    );
+
+    await hq.invoke(
+      employee: 'marketing',
+      goal: 'Review architecture',
+      context: context,
+    );
+
+    final userMessage = modelProvider.capturedRequest!.conversation.messages
+        .whereType<UserMessage>()
+        .single;
+    expect(userMessage.content, contains('Previous Workflow Results'));
+    expect(userMessage.content, contains('Competitor research complete.'));
+    expect(userMessage.content, contains('Current Goal'));
+    expect(userMessage.content, endsWith('Review architecture'));
+  });
 }

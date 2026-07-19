@@ -1,0 +1,194 @@
+# ADR-0003 — Execution Strategy
+
+Status: Proposed
+
+---
+
+# Context
+
+The Planner decides WHAT should happen.
+
+The Workflow executes HOW it happens.
+
+A missing layer still exists:
+
+Should the Plan be executed immediately?
+
+Should it wait for approval?
+
+Should it stop after one step?
+
+Should it execute sequentially?
+
+Should it execute in parallel?
+
+These are execution policies.
+
+They should not belong to Planner.
+
+They should not belong to Workflow.
+
+---
+
+# Decision
+
+Introduce an Execution Strategy abstraction.
+
+Responsibilities
+
+Planner
+
+↓
+
+creates Plan
+
+Execution Strategy
+
+↓
+
+decides how the Plan should be executed
+
+Workflow
+
+↓
+
+executes according to the Strategy
+
+Runtime
+
+↓
+
+executes one Employee
+
+---
+
+# Responsibilities
+
+Planner
+
+- Analyze Goal
+- Produce Plan
+- Never execute
+
+Execution Strategy
+
+- Decide execution policy
+- Select next step
+- Pause when required
+- Resume when possible
+
+Workflow
+
+- Execute Plan
+- Update step state
+- Retry
+- Track progress
+
+Runtime
+
+- Execute one Employee
+- Handle Tool Calls
+- Return Result
+
+---
+
+# Initial MVP
+
+Only one strategy exists.
+
+ImmediateExecutionStrategy
+
+Behavior
+
+Receive Plan
+
+↓
+
+Execute every step sequentially
+
+↓
+
+Finish
+
+No approval
+
+No retry
+
+No branching
+
+No priorities
+
+No deadlines
+
+---
+
+# Strategy Interface
+
+abstract class ExecutionStrategy {
+
+    ExecutionDecision decide(Plan plan);
+
+}
+
+ExecutionDecision contains:
+
+- execution mode
+- selected steps
+
+Nothing else.
+
+---
+
+# Why
+
+Planning
+
+Execution Policy
+
+Execution
+
+are three different responsibilities.
+
+Keeping them independent allows:
+
+- Human approval
+- Dry run
+- Simulation
+- Parallel execution
+- Resume
+- Scheduling
+
+without changing Planner or Runtime.
+
+---
+
+# Future Strategies
+
+ImmediateExecutionStrategy
+
+ApprovalExecutionStrategy
+
+ParallelExecutionStrategy
+
+PriorityExecutionStrategy
+
+ScheduledExecutionStrategy
+
+SimulationStrategy
+
+---
+
+# Consequences
+
+Pros
+
+- Workflow stays simple.
+- Planner remains replaceable.
+- Runtime remains deterministic.
+- Execution policy becomes configurable.
+
+Cons
+
+- One additional abstraction.
+
+Worth the tradeoff.

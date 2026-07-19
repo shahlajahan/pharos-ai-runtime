@@ -2,6 +2,7 @@ import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/hq/hq_bootstrapper.dart';
 import 'package:pharos_ai_runtime/hq/hq_context.dart';
 import 'package:pharos_ai_runtime/hq/hq_source.dart';
+import 'package:pharos_ai_runtime/hq/workflow_context_serializer.dart';
 import 'package:pharos_ai_runtime/memory/conversation_memory.dart';
 import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_provider.dart';
@@ -16,6 +17,7 @@ import 'package:pharos_ai_runtime/tooling/tool_definition.dart';
 import 'package:pharos_ai_runtime/tooling/tool_invoker.dart';
 import 'package:pharos_ai_runtime/tooling/tool_output.dart';
 import 'package:pharos_ai_runtime/tooling/tool_registry.dart';
+import 'package:pharos_ai_runtime/workflow/workflow_context.dart';
 
 /// First public Pharos HQ execution API: executes a single Employee by id
 /// with a goal and returns the Runtime's final result.
@@ -53,12 +55,23 @@ class HQ {
   /// and inspect it afterward; every UserMessage, AssistantMessage, and
   /// ToolMessage produced during execution is recorded into it
   /// automatically — no explicit recording calls are needed.
+  ///
+  /// Pass [context] (as Workflow does) so this call's prompt is prepended
+  /// with a deterministic summary of previously executed WorkflowSteps.
+  /// Omitting it (or passing one with no previousSteps) leaves the prompt
+  /// exactly as it was before WorkflowContext existed.
   Future<Result> execute({
     required String employee,
     required String goal,
     ConversationMemory? memory,
+    WorkflowContext? context,
   }) {
-    return _run(employee: employee, goal: goal, memory: memory);
+    return _run(
+      employee: employee,
+      goal: goal,
+      memory: memory,
+      context: context,
+    );
   }
 
   /// Invokes [employee] with [goal] and returns its Result, exactly like
@@ -69,8 +82,14 @@ class HQ {
     required String employee,
     required String goal,
     ConversationMemory? memory,
+    WorkflowContext? context,
   }) {
-    return _run(employee: employee, goal: goal, memory: memory);
+    return _run(
+      employee: employee,
+      goal: goal,
+      memory: memory,
+      context: context,
+    );
   }
 
   /// Shared execution flow for [execute] and [invoke]: resolves the
@@ -81,6 +100,7 @@ class HQ {
     required String employee,
     required String goal,
     ConversationMemory? memory,
+    WorkflowContext? context,
   }) async {
     final bootResult = await _bootstrap.boot(_source);
 
@@ -101,7 +121,7 @@ class HQ {
       return Result.failure('Employee "$employee" not found.');
     }
 
-    final context = HQContext(
+    final hqContext = HQContext(
       goal: goal,
       employee: selectedEmployee,
       memory: memory,
@@ -109,26 +129,39 @@ class HQ {
 
     final runtime = Runtime(
       modelProvider: _modelProvider,
-      requestBuilder: _GoalRequestBuilder(goal: context.goal),
+      requestBuilder: _GoalRequestBuilder(
+        goal: hqContext.goal,
+        workflowContext: context,
+      ),
       responseHandler: _responseHandler,
       toolRegistry: _toolRegistry,
       toolInvoker: _toolInvoker,
     );
 
-    return runtime.run(context.employee, memory: context.memory);
+    return runtime.run(hqContext.employee, memory: hqContext.memory);
   }
 }
 
 /// Builds the initial Conversation for an HQ.execute() call: reuses
 /// DefaultRuntimeRequestBuilder for the employee-derived SystemMessage,
-/// then replaces the empty UserMessage with one containing the goal.
+/// then replaces the empty UserMessage with one containing the goal —
+/// prepended with a deterministic summary of [workflowContext]'s
+/// previousSteps, when it has any.
 class _GoalRequestBuilder extends RuntimeRequestBuilder {
-  _GoalRequestBuilder({required String goal, RuntimeRequestBuilder? base})
-    : _goal = goal,
-      _base = base ?? DefaultRuntimeRequestBuilder();
+  _GoalRequestBuilder({
+    required String goal,
+    WorkflowContext? workflowContext,
+    RuntimeRequestBuilder? base,
+    WorkflowContextSerializer? serializer,
+  }) : _goal = goal,
+       _workflowContext = workflowContext,
+       _base = base ?? DefaultRuntimeRequestBuilder(),
+       _serializer = serializer ?? const WorkflowContextSerializer();
 
   final String _goal;
+  final WorkflowContext? _workflowContext;
   final RuntimeRequestBuilder _base;
+  final WorkflowContextSerializer _serializer;
 
   @override
   ModelRequest build(
@@ -138,9 +171,15 @@ class _GoalRequestBuilder extends RuntimeRequestBuilder {
   }) {
     final base = _base.build(employee, tools: tools, toolOutputs: toolOutputs);
 
+    final workflowContext = _workflowContext;
+    final content =
+        workflowContext != null && workflowContext.previousSteps.isNotEmpty
+        ? '${_serializer.serialize(workflowContext)}\nCurrent Goal\n\n$_goal'
+        : _goal;
+
     final messages = [
       for (final message in base.conversation.messages)
-        if (message is UserMessage) UserMessage(content: _goal) else message,
+        if (message is UserMessage) UserMessage(content: content) else message,
     ];
 
     return ModelRequest(

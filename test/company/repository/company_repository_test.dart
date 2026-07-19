@@ -1,0 +1,45 @@
+import 'package:pharos_ai_runtime/company/company.dart';
+import 'package:pharos_ai_runtime/company/repository/company_repository.dart';
+import 'package:pharos_ai_runtime/company/resources/ai_cost.dart';
+import 'package:pharos_ai_runtime/company/resources/api_usage.dart';
+import 'package:pharos_ai_runtime/company/resources/budget.dart';
+import 'package:pharos_ai_runtime/company/resources/cash_flow.dart';
+import 'package:pharos_ai_runtime/company/resources/expenses.dart';
+import 'package:pharos_ai_runtime/company/resources/revenue.dart';
+import 'package:test/test.dart';
+
+class _FakeCompanyRepository implements CompanyRepository {
+  Company? stored;
+
+  @override
+  Future<Company?> load() async => stored;
+
+  @override
+  Future<void> save(Company company) async {
+    stored = company;
+  }
+}
+
+void main() {
+  test('CompanyRepository contract compiles: exposes load() returning '
+      'Company? and save(Company)', () async {
+    final repository = _FakeCompanyRepository();
+    const company = Company(
+      departments: [],
+      products: [],
+      projects: [],
+      budget: Budget(),
+      revenue: Revenue(),
+      cashFlow: CashFlow(),
+      expenses: Expenses(),
+      aiCost: AiCost(),
+      apiUsage: ApiUsage(),
+    );
+
+    expect(await repository.load(), isNull);
+
+    await repository.save(company);
+
+    expect(await repository.load(), same(company));
+  });
+}
