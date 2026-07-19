@@ -1,10 +1,15 @@
 import 'package:pharos_ai_runtime/company/company.dart';
+import 'package:pharos_ai_runtime/company/knowledge/knowledge.dart';
+import 'package:pharos_ai_runtime/company/metrics/metrics.dart';
+import 'package:pharos_ai_runtime/company/organization/organization.dart';
+import 'package:pharos_ai_runtime/company/portfolio/portfolio.dart';
 import 'package:pharos_ai_runtime/company/repository/company_repository.dart';
 import 'package:pharos_ai_runtime/company/resources/ai_cost.dart';
 import 'package:pharos_ai_runtime/company/resources/api_usage.dart';
 import 'package:pharos_ai_runtime/company/resources/budget.dart';
 import 'package:pharos_ai_runtime/company/resources/cash_flow.dart';
 import 'package:pharos_ai_runtime/company/resources/expenses.dart';
+import 'package:pharos_ai_runtime/company/resources/resources.dart';
 import 'package:pharos_ai_runtime/company/resources/revenue.dart';
 import 'package:test/test.dart';
 
@@ -25,15 +30,18 @@ void main() {
       'Company? and save(Company)', () async {
     final repository = _FakeCompanyRepository();
     const company = Company(
-      departments: [],
-      products: [],
-      projects: [],
-      budget: Budget(),
-      revenue: Revenue(),
-      cashFlow: CashFlow(),
-      expenses: Expenses(),
-      aiCost: AiCost(),
-      apiUsage: ApiUsage(),
+      organization: Organization(departments: []),
+      portfolio: Portfolio(products: [], projects: []),
+      resources: Resources(
+        budget: Budget(),
+        revenue: Revenue(),
+        cashFlow: CashFlow(),
+        expenses: Expenses(),
+        aiCost: AiCost(),
+        apiUsage: ApiUsage(),
+      ),
+      knowledge: Knowledge(),
+      metrics: Metrics(),
     );
 
     expect(await repository.load(), isNull);
