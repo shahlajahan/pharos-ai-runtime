@@ -1,7 +1,7 @@
 import 'package:pharos_ai_runtime/runtime/intent/runtime_intent.dart';
-import 'package:pharos_ai_runtime/runtime/planning/planner.dart';
 import 'package:pharos_ai_runtime/runtime/planning/planning_request.dart';
 import 'package:pharos_ai_runtime/runtime/planning/planning_result.dart';
+import 'package:pharos_ai_runtime/runtime/planning/runtime_planner.dart';
 import 'package:test/test.dart';
 
 class _FakeRuntimeIntent implements RuntimeIntent {
@@ -12,7 +12,7 @@ class _FakeRuntimeIntent implements RuntimeIntent {
   String get title => 'Release version 2.0';
 }
 
-class _FakePlanner implements Planner {
+class _FakeRuntimePlanner implements RuntimePlanner {
   @override
   Future<PlanningResult> plan(PlanningRequest request) async {
     return const PlanningResult();
@@ -20,12 +20,15 @@ class _FakePlanner implements Planner {
 }
 
 void main() {
-  test('Planner can be implemented with a fake implementation', () async {
-    final planner = _FakePlanner();
-    final request = PlanningRequest(intent: _FakeRuntimeIntent());
+  test(
+    'RuntimePlanner can be implemented with a fake implementation',
+    () async {
+      final planner = _FakeRuntimePlanner();
+      final request = PlanningRequest(intent: _FakeRuntimeIntent());
 
-    final result = await planner.plan(request);
+      final result = await planner.plan(request);
 
-    expect(result, isA<PlanningResult>());
-  });
+      expect(result, isA<PlanningResult>());
+    },
+  );
 }
