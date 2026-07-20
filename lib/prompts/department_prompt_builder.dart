@@ -1,59 +1,18 @@
-import 'package:pharos_ai_runtime/company/department.dart';
-import 'package:pharos_ai_runtime/decision/decision.dart';
-import 'package:pharos_ai_runtime/decision/decision_engine.dart';
+import 'package:pharos_ai_runtime/priorities/department_summary.dart';
+import 'package:pharos_ai_runtime/priorities/executive_summary.dart';
 
-/// Builds the grounded prompt sent to the LLM for one Department, and
-/// composes every department's prompt into the single request DailyAgent
-/// sends for the full daily brief. Per the Prompt Contract, the LLM
-/// receives only Top Decisions, Blockers, Informational Notes, Evidence,
-/// and Decision Scores — never raw HQ markdown, filesystem paths, or
-/// CompanyDocuments, and it never calculates priority itself. Pure and
-/// deterministic: the same Decisions and date always produce the same
-/// prompt.
+/// Builds the single prompt DailyAgent sends the LLM. Per the Prompt
+/// Contract, the LLM receives only the Executive Summary, Department
+/// Summaries, Top Decisions, Blocked Decisions, Health Scores, and
+/// Observability Gaps — nothing else: no CompanyDocuments, no raw
+/// markdown, no filesystem paths, and no departmental decisions in
+/// isolation. Pure and deterministic: the same ExecutiveSummary and date
+/// always produce the same prompt.
 class DepartmentPromptBuilder {
   const DepartmentPromptBuilder();
 
-  String build({
-    required Department department,
-    required List<Decision> decisions,
-    required DateTime currentDate,
-  }) {
-    final blockers = decisions.where((d) => d.blocked).toList();
-    final priorities = decisions
-        .where((d) => !d.blocked && DecisionEngine.isActionable(d.type))
-        .toList();
-    final informational = decisions
-        .where((d) => !d.blocked && !DecisionEngine.isActionable(d.type))
-        .toList();
-    final name = department.displayName;
-
-    final buffer = StringBuffer()
-      ..writeln('$name Top Decisions:')
-      ..write(_renderDecisions(priorities))
-      ..writeln('$name Blockers:')
-      ..write(_renderDecisions(blockers))
-      ..writeln('$name Informational Notes:')
-      ..write(_renderDecisions(informational))
-      ..writeln()
-      ..writeln('Decision Goal:')
-      ..writeln(
-        'Using ONLY the $name Top Decisions, Blockers, Informational '
-        'Notes, Evidence, and Decision Scores above, explain each in '
-        'short, natural, executive-ready prose. The Runtime already '
-        'determined priority order, impact, urgency, and confidence — '
-        'do not invent, reorder, merge, or add decisions, and do not '
-        'calculate your own priority. Never recommend action on an item '
-        'listed under Blockers; state why it is blocked instead. Cite '
-        'only the Evidence already listed for each decision.',
-      );
-
-    return buffer.toString();
-  }
-
-  /// Composes every department's prompt into the single request sent for
-  /// the full daily brief, in a fixed department order.
   String buildReport({
-    required Map<Department, List<Decision>> decisionsByDepartment,
+    required ExecutiveSummary summary,
     required DateTime currentDate,
   }) {
     final buffer = StringBuffer()
@@ -63,76 +22,116 @@ class DepartmentPromptBuilder {
       ..writeln()
       ..writeln('Rules:')
       ..writeln(
-        '- Reason only over the Decisions below — you are a '
+        '- Reason only over the Executive Summary below — you are a '
         'communication layer, not the decision maker.',
       )
-      ..writeln('- Never invent company facts.')
-      ..writeln('- Never invent KPIs.')
-      ..writeln('- Never invent campaigns.')
-      ..writeln('- Never invent business metrics.')
-      ..writeln('- Never invent a Decision, priority, or score.')
       ..writeln(
-        '- If information is unavailable, explicitly state that it is '
-        'unavailable rather than guessing.',
+        '- The Runtime already aggregated every department\'s decisions; '
+        'do not invent, reorder, merge, or add a decision, and do not '
+        'calculate your own priority or health score.',
       )
-      ..writeln();
-
-    for (final department in Department.values) {
-      final decisions = decisionsByDepartment[department] ?? const <Decision>[];
-      buffer
-        ..writeln(
-          build(
-            department: department,
-            decisions: decisions,
-            currentDate: currentDate,
-          ),
-        )
-        ..writeln();
-    }
-
-    buffer.writeln(
-      "Using ONLY the Decisions above, write today's Executive Brief "
-      'with exactly one heading per department, in this order:',
-    );
-
-    for (final department in Department.values) {
-      buffer.writeln("Today's ${department.displayName} Priorities");
-    }
-
-    buffer
+      ..writeln(
+        '- Never invent company facts, KPIs, campaigns, or business metrics.',
+      )
+      ..writeln(
+        '- Never recommend action on an item listed under Blocked '
+        'Decisions; state why it is blocked instead.',
+      )
+      ..writeln()
+      ..writeln('Executive Summary:')
+      ..writeln('Company Health: ${_percentage(summary.companyHealth)}%')
+      ..writeln('Top Decisions: ${summary.topDecisions.length}')
+      ..writeln('Blocked Decisions: ${summary.blockedDecisions.length}')
+      ..writeln()
+      ..writeln('Department Summaries:')
+      ..write(_renderDepartmentSummaries(summary.departmentSummaries))
+      ..writeln('Health Scores:')
+      ..write(_renderHealthScores(summary))
+      ..writeln('Top Decisions:')
+      ..write(_renderMergedDecisions(summary.topDecisions))
+      ..writeln('Blocked Decisions:')
+      ..write(_renderMergedDecisions(summary.blockedDecisions))
+      ..writeln('Observability Gaps: ${_joinOrNone(summary.observabilityGaps)}')
       ..writeln()
       ..writeln(
-        'Do not include Blocked Items, Missing Operational Data, or '
-        'Recommended Next Connections sections — the Runtime appends '
-        'them automatically.',
+        "Using ONLY the information above, write today's Executive Brief: "
+        'a short Company Health statement, then explain each Top '
+        'Decision (citing its Evidence and Confidence) and each Blocked '
+        'Decision (stating why it is blocked), and close with the '
+        'Observability Gaps as a dashboard, never as "Connect X" '
+        'recommendations.',
       );
 
     return buffer.toString();
   }
 
-  String _renderDecisions(List<Decision> decisions) {
+  String _renderDepartmentSummaries(List<DepartmentSummary> summaries) {
     final buffer = StringBuffer();
 
-    if (decisions.isEmpty) {
+    if (summaries.isEmpty) {
       buffer.writeln('- None.');
       return buffer.toString();
     }
 
-    for (final decision in decisions) {
+    for (final summary in summaries) {
+      buffer.writeln(
+        '- ${summary.department.displayName}: '
+        'Decision Count: ${summary.decisionCount}, '
+        'Blocked Count: ${summary.blockedCount}, '
+        'Observability: ${_percentage(summary.observability)}%, '
+        'Readiness: ${_percentage(summary.readiness)}%, '
+        'Health: ${_percentage(summary.health)}%',
+      );
+    }
+
+    return buffer.toString();
+  }
+
+  String _renderHealthScores(ExecutiveSummary summary) {
+    final buffer = StringBuffer()
+      ..writeln('- Company: ${_percentage(summary.companyHealth)}%');
+
+    for (final department in summary.departmentSummaries) {
+      buffer.writeln(
+        '- ${department.department.displayName}: '
+        '${_percentage(department.health)}%',
+      );
+    }
+
+    return buffer.toString();
+  }
+
+  String _renderMergedDecisions(List<MergedDecision> merged) {
+    final buffer = StringBuffer();
+
+    if (merged.isEmpty) {
+      buffer.writeln('- None.');
+      return buffer.toString();
+    }
+
+    for (final entry in merged) {
+      final decision = entry.decision;
+      final affects = entry.affects.map((d) => d.displayName).join(', ');
       final reasons = decision.reasons.map((r) => r.statement).join('; ');
       final evidence = decision.evidence
           .map((type) => type.displayName)
           .join(', ');
 
       buffer.writeln(
-        '- ${decision.title} [Priority: ${decision.priority.name}, '
-        'Impact: ${decision.score.impact.toStringAsFixed(2)}, '
-        'Urgency: ${decision.score.urgency.toStringAsFixed(2)}, '
-        'Confidence: ${decision.confidence.toStringAsFixed(2)}] '
-        'Reasons: $reasons. Evidence: $evidence.',
+        '- ${decision.title} [Affects: $affects, Priority: '
+        '${decision.priority.name}, Impact: '
+        '${decision.score.impact.toStringAsFixed(2)}, Urgency: '
+        '${decision.score.urgency.toStringAsFixed(2)}, Confidence: '
+        '${decision.confidence.toStringAsFixed(2)}] Reasons: $reasons. '
+        'Evidence: $evidence.',
       );
     }
 
     return buffer.toString();
   }
+
+  String _percentage(double value) => (value * 100).round().toString();
+
+  String _joinOrNone(List<String> entries) =>
+      entries.isEmpty ? 'None' : entries.join(', ');
 }

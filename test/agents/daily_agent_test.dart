@@ -13,7 +13,7 @@ import 'package:test/test.dart';
 class _SpyModelProvider extends ModelProvider {
   ModelRequest? capturedRequest;
   ModelResponse response = const ModelResponse(
-    text: "Today's Marketing Priorities\nConnect GA4 to unblock reporting.",
+    text: 'Company health is strong today.',
   );
 
   @override
@@ -73,17 +73,18 @@ void main() {
     expect(modelProvider.capturedRequest, isNotNull);
   });
 
-  test('run() sends a prompt grounded in Runtime-ranked Decisions, never '
-      'raw HQ markdown or a filesystem path', () async {
+  test('run() sends a prompt grounded in the aggregated Executive Summary, '
+      'never raw HQ markdown or a filesystem path', () async {
     final productsDir = Directory('${workspace.path}/products')..createSync();
     File('${productsDir.path}/petsupo.md').writeAsStringSync(
       '# Petsupo\n\n'
       'This exact raw markdown sentence must never reach the LLM.',
     );
-    final websitesDir = Directory('${workspace.path}/websites')..createSync();
+    final assetsDir = Directory('${workspace.path}/assets')..createSync();
     File(
-      '${websitesDir.path}/petsupo-com.md',
-    ).writeAsStringSync('Marketing website.');
+      '${assetsDir.path}/brand-kit.md',
+    ).writeAsStringSync('Brand guidelines.');
+    File('${assetsDir.path}/hero-video.md').writeAsStringSync('Hero video.');
 
     final modelProvider = _SpyModelProvider();
     final agent = DailyAgent(workspaceRoot: workspace.path);
@@ -95,10 +96,13 @@ void main() {
         .single
         .content;
 
-    expect(prompt, contains('Marketing Top Decisions:'));
-    expect(prompt, contains('Connect GA4'));
-    expect(prompt, contains('Priority: critical'));
-    expect(prompt, contains('Evidence:'));
+    expect(prompt, contains('Executive Summary:'));
+    expect(prompt, contains('Company Health:'));
+    expect(prompt, contains('Department Summaries:'));
+    expect(prompt, contains('Health Scores:'));
+    expect(prompt, contains('Top Decisions:'));
+    expect(prompt, contains('Prepare launch campaign'));
+    expect(prompt, contains('Affects:'));
     expect(
       prompt,
       isNot(
@@ -109,26 +113,30 @@ void main() {
     expect(prompt, isNot(contains('.md')));
   });
 
-  test('run() never lets the LLM calculate priority: the prompt tells it to '
-      'only explain decisions the Runtime already ranked', () async {
-    final modelProvider = _SpyModelProvider();
-    final agent = DailyAgent(workspaceRoot: workspace.path);
+  test(
+    'run() never lets the LLM calculate its own priority or health score',
+    () async {
+      final modelProvider = _SpyModelProvider();
+      final agent = DailyAgent(workspaceRoot: workspace.path);
 
-    await agent.run(_context(modelProvider));
+      await agent.run(_context(modelProvider));
 
-    final prompt = modelProvider.capturedRequest!.conversation.messages
-        .whereType<UserMessage>()
-        .single
-        .content;
+      final prompt = modelProvider.capturedRequest!.conversation.messages
+          .whereType<UserMessage>()
+          .single
+          .content;
 
-    expect(prompt, contains('not the decision maker'));
-    expect(prompt, contains('do not calculate your own priority'));
-  });
+      expect(prompt, contains('not the decision maker'));
+      expect(
+        prompt,
+        contains('do not calculate your own priority or health score'),
+      );
+    },
+  );
 
   test('run() prints PHAROS TODAY, the generated Executive Brief, and '
-      'Runtime-rendered Blocked Items, Missing Operational Data, and '
-      'Recommended Next Connections sections, with blocked work never '
-      'appearing among priorities', () async {
+      'Runtime-rendered Blocked Items and Observability Gaps as a '
+      'dashboard — never as "Connect X" recommendations', () async {
     final websitesDir = Directory('${workspace.path}/websites')..createSync();
     File(
       '${websitesDir.path}/petsupo-com.md',
@@ -140,9 +148,7 @@ void main() {
     File('${assetsDir.path}/hero-video.md').writeAsStringSync('Hero video.');
 
     final modelProvider = _SpyModelProvider()
-      ..response = const ModelResponse(
-        text: "Today's Marketing Priorities\nConnect GA4.",
-      );
+      ..response = const ModelResponse(text: 'Company health is strong.');
     final agent = DailyAgent(workspaceRoot: workspace.path);
 
     final output = await _capturePrintedLines(
@@ -151,11 +157,12 @@ void main() {
     final report = output.join('\n');
 
     expect(report, contains('PHAROS TODAY'));
-    expect(report, contains('Connect GA4.'));
+    expect(report, contains('Company health is strong.'));
     expect(report, contains('Blocked Items'));
-    expect(report, contains('Missing Operational Data'));
-    expect(report, contains('Recommended Next Connections'));
+    expect(report, contains('Observability Gaps'));
     expect(report, contains('Campaign Optimization'));
+    expect(report, isNot(contains('Connect reachable')));
+    expect(report, isNot(contains('Missing Operational Data')));
   });
 
   test('run() returns a success Result', () async {

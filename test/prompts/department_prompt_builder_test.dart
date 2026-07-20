@@ -5,25 +5,27 @@ import 'package:pharos_ai_runtime/decision/decision_reason.dart';
 import 'package:pharos_ai_runtime/decision/decision_score.dart';
 import 'package:pharos_ai_runtime/decision/decision_type.dart';
 import 'package:pharos_ai_runtime/knowledge/fact_type.dart';
+import 'package:pharos_ai_runtime/priorities/department_summary.dart';
+import 'package:pharos_ai_runtime/priorities/executive_summary.dart';
 import 'package:pharos_ai_runtime/prompts/department_prompt_builder.dart';
 import 'package:test/test.dart';
 
-Decision _priorityDecision() => const Decision(
-  id: 'marketing.analytics.connect',
+Decision _topDecision() => const Decision(
+  id: 'marketing.launch.prepare',
   department: Department.marketing,
-  title: 'Connect GA4',
-  type: DecisionType.connect,
-  priority: DecisionPriority.critical,
-  score: DecisionScore(impact: 0.9, urgency: 0.9, evidenceCompleteness: 1.0),
+  title: 'Prepare launch campaign',
+  type: DecisionType.launch,
+  priority: DecisionPriority.high,
+  score: DecisionScore(impact: 0.8, urgency: 0.7, evidenceCompleteness: 1.0),
   blocked: false,
   reasons: [
-    DecisionReason('Website exists'),
-    DecisionReason('Analytics unavailable'),
+    DecisionReason('Product exists'),
+    DecisionReason('Brand assets ready'),
   ],
-  evidence: [FactType.website, FactType.analyticsPlatform],
+  evidence: [FactType.product, FactType.brandAsset],
 );
 
-Decision _blockerDecision() => const Decision(
+Decision _blockedDecision() => const Decision(
   id: 'marketing.campaign.blocked',
   department: Department.marketing,
   title: 'Campaign Optimization',
@@ -32,117 +34,120 @@ Decision _blockerDecision() => const Decision(
   score: DecisionScore(impact: 0.9, urgency: 0.9, evidenceCompleteness: 1.0),
   blocked: true,
   reasons: [DecisionReason('Analytics unavailable')],
-  evidence: [FactType.website, FactType.analyticsPlatform],
+  evidence: [FactType.analyticsPlatform],
 );
 
-List<Decision> _decisions(Department department) => [
-  _priorityDecision(),
-  _blockerDecision(),
-];
+DepartmentSummary _departmentSummary() => DepartmentSummary(
+  department: Department.marketing,
+  decisionCount: 2,
+  blockedCount: 1,
+  observability: 0.6,
+  readiness: 0.75,
+  health: 0.7,
+  topDecisions: [_topDecision()],
+  blockedDecisions: [_blockedDecision()],
+  missingOperationalData: const ['reachable'],
+);
+
+ExecutiveSummary _summary() => ExecutiveSummary(
+  companyHealth: 0.79,
+  topDecisions: [
+    MergedDecision(
+      decision: _topDecision(),
+      affects: const [Department.marketing],
+    ),
+  ],
+  blockedDecisions: [
+    MergedDecision(
+      decision: _blockedDecision(),
+      affects: const [Department.marketing],
+    ),
+  ],
+  observabilityGaps: const ['Analytics', 'Website Uptime'],
+  departmentSummaries: [_departmentSummary()],
+);
 
 void main() {
-  test('build() generates identical prompts for identical decisions and '
-      'dates', () {
-    const builder = DepartmentPromptBuilder();
-    final date = DateTime(2026, 7, 20);
-
-    final first = builder.build(
-      department: Department.marketing,
-      decisions: _decisions(Department.marketing),
-      currentDate: date,
-    );
-    final second = builder.build(
-      department: Department.marketing,
-      decisions: _decisions(Department.marketing),
-      currentDate: date,
-    );
-
-    expect(first, second);
-  });
-
   test(
-    'build() separates Top Decisions from Blockers, and renders Evidence '
-    'and Decision Scores — never a raw markdown excerpt or filesystem path',
+    'buildReport() generates identical prompts for identical summaries and dates',
     () {
       const builder = DepartmentPromptBuilder();
+      final date = DateTime(2026, 7, 20);
 
-      final prompt = builder.build(
-        department: Department.marketing,
-        decisions: _decisions(Department.marketing),
-        currentDate: DateTime(2026, 7, 20),
+      final first = builder.buildReport(summary: _summary(), currentDate: date);
+      final second = builder.buildReport(
+        summary: _summary(),
+        currentDate: date,
       );
 
-      expect(prompt, contains('Marketing Top Decisions:'));
-      expect(prompt, contains('Marketing Blockers:'));
-      expect(prompt, contains('Marketing Informational Notes:'));
-      expect(prompt, contains('Connect GA4'));
-      expect(prompt, contains('Campaign Optimization'));
-      expect(prompt, contains('Priority: critical'));
-      expect(prompt, contains('Impact: 0.90'));
-      expect(prompt, contains('Urgency: 0.90'));
-      expect(prompt, contains('Confidence: 1.00'));
-      expect(prompt, contains('Evidence: Website, Analytics Platform'));
-      expect(prompt, isNot(contains('.md')));
-      expect(prompt, isNot(contains('products/')));
+      expect(first, second);
     },
   );
 
-  test('build() instructs the LLM to explain decisions, not calculate '
-      'priority itself, and never recommend action on a blocked item', () {
+  test('buildReport() renders Executive Summary, Department Summaries, Health '
+      'Scores, Top Decisions, Blocked Decisions, and Observability Gaps', () {
     const builder = DepartmentPromptBuilder();
 
-    final prompt = builder.build(
-      department: Department.engineering,
-      decisions: const [],
+    final prompt = builder.buildReport(
+      summary: _summary(),
       currentDate: DateTime(2026, 7, 20),
     );
 
-    expect(prompt, contains('do not calculate your own priority'));
+    expect(prompt, contains('Executive Summary:'));
+    expect(prompt, contains('Company Health: 79%'));
+    expect(prompt, contains('Department Summaries:'));
+    expect(prompt, contains('Marketing:'));
+    expect(prompt, contains('Health Scores:'));
+    expect(prompt, contains('Top Decisions:'));
+    expect(prompt, contains('Prepare launch campaign'));
+    expect(prompt, contains('Affects: Marketing'));
+    expect(prompt, contains('Blocked Decisions:'));
+    expect(prompt, contains('Campaign Optimization'));
+    expect(prompt, contains('Observability Gaps: Analytics, Website Uptime'));
+  });
+
+  test('buildReport() never mentions a raw signal name or a "Connect X" '
+      'recommendation for observability gaps', () {
+    const builder = DepartmentPromptBuilder();
+
+    final prompt = builder.buildReport(
+      summary: _summary(),
+      currentDate: DateTime(2026, 7, 20),
+    );
+
+    expect(prompt, isNot(contains('Connect reachable')));
+    expect(prompt, isNot(contains('reachable=')));
+  });
+
+  test('buildReport() instructs the LLM not to calculate its own priority or '
+      'health score, and never to act on a blocked decision', () {
+    const builder = DepartmentPromptBuilder();
+
+    final prompt = builder.buildReport(
+      summary: _summary(),
+      currentDate: DateTime(2026, 7, 20),
+    );
+
     expect(
       prompt,
-      contains('Never recommend action on an item listed under Blockers'),
+      contains('do not calculate your own priority or health score'),
     );
-  });
-
-  test('buildReport() composes one Top Decisions section per department, in '
-      'order, even for departments with no decisions', () {
-    const builder = DepartmentPromptBuilder();
-
-    final report = builder.buildReport(
-      decisionsByDepartment: {
-        Department.marketing: _decisions(Department.marketing),
-      },
-      currentDate: DateTime(2026, 7, 20),
+    expect(
+      prompt,
+      contains(
+        'Never recommend action on an item listed under Blocked Decisions',
+      ),
     );
-
-    for (final department in Department.values) {
-      expect(report, contains('${department.displayName} Top Decisions:'));
-      expect(report, contains("Today's ${department.displayName} Priorities"));
-    }
-  });
-
-  test('buildReport() instructs the model not to render Runtime-owned '
-      'sections', () {
-    const builder = DepartmentPromptBuilder();
-
-    final report = builder.buildReport(
-      decisionsByDepartment: const {},
-      currentDate: DateTime(2026, 7, 20),
-    );
-
-    expect(report, contains('Blocked Items'));
-    expect(report, contains('Missing Operational Data'));
-    expect(report, contains('Runtime appends'));
   });
 
   test('buildReport() includes the current date', () {
     const builder = DepartmentPromptBuilder();
 
-    final report = builder.buildReport(
-      decisionsByDepartment: const {},
+    final prompt = builder.buildReport(
+      summary: _summary(),
       currentDate: DateTime(2026, 7, 20),
     );
 
-    expect(report, contains('2026-07-20'));
+    expect(prompt, contains('2026-07-20'));
   });
 }
