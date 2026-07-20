@@ -1,0 +1,330 @@
+# ADR-0019 — AI Operating System Architecture
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+Traditional software systems are typically organized around applications.
+
+Examples include:
+
+- CRM systems
+- ERPs
+- Websites
+- Mobile applications
+
+AI systems are often organized around:
+
+- chat interfaces
+- prompts
+- LLM providers
+
+Neither model adequately represents the long-term vision of Pharos.
+
+Pharos is intended to become an AI Operating System capable of supporting
+multiple companies, products, users, Agents and execution environments.
+
+The architecture therefore requires a clear definition of its fundamental
+layers.
+
+---
+
+# Decision
+
+The platform is organized into independent architectural layers.
+
+Each layer owns a distinct responsibility.
+
+```
++------------------------------------------------------+
+|                User Interfaces                       |
+|------------------------------------------------------|
+| Chat | Voice | API | CLI | Mobile | Web | Scheduler  |
++------------------------------------------------------+
+                        │
+                        ▼
++------------------------------------------------------+
+|                    AI Agents                         |
+|------------------------------------------------------|
+| CEO | Engineering | Marketing | Sales | Finance ...  |
++------------------------------------------------------+
+                        │
+                        ▼
++------------------------------------------------------+
+|                Intelligence Layer                    |
+|------------------------------------------------------|
+| Memory | Knowledge | Company Brain | Reasoning       |
++------------------------------------------------------+
+                        │
+                        ▼
++------------------------------------------------------+
+|                    Runtime                           |
+|------------------------------------------------------|
+| Intent | Planning | Workflow | Execution | Streaming |
++------------------------------------------------------+
+                        │
+                        ▼
++------------------------------------------------------+
+|                 Capability Layer                     |
+|------------------------------------------------------|
+| Tools | Plugins | Integrations | External Services   |
++------------------------------------------------------+
+                        │
+                        ▼
++------------------------------------------------------+
+|              External Infrastructure                 |
+|------------------------------------------------------|
+| Files | Git | Databases | APIs | Cloud | Devices     |
++------------------------------------------------------+
+```
+
+Every layer communicates only through published contracts.
+
+---
+
+# Layer Responsibilities
+
+## User Interface Layer
+
+Responsible for interaction.
+
+Examples:
+
+- Chat
+- Mobile
+- Web
+- Voice
+- API
+
+Never performs reasoning.
+
+---
+
+## Agent Layer
+
+Responsible for intelligence.
+
+Agents:
+
+- reason
+- plan
+- retrieve knowledge
+- retrieve memory
+- create RuntimeIntent
+
+Agents never execute work directly.
+
+---
+
+## Intelligence Layer
+
+Provides information required for reasoning.
+
+Includes:
+
+- Memory
+- Knowledge
+- Company Brain
+
+Does not perform execution.
+
+---
+
+## Runtime Layer
+
+Responsible only for execution.
+
+Includes:
+
+- RuntimeIntent
+- RuntimePlanner
+- RuntimeEngine
+- WorkflowBuilder
+- Workflow
+
+Runtime never performs reasoning.
+
+---
+
+## Capability Layer
+
+Provides executable capabilities.
+
+Examples:
+
+- Tools
+- Plugins
+- External integrations
+
+Capabilities extend the platform without modifying Runtime.
+
+---
+
+## Infrastructure Layer
+
+Contains implementation-specific systems.
+
+Examples:
+
+- databases
+- cloud providers
+- Git repositories
+- local files
+- external APIs
+
+Infrastructure is replaceable.
+
+---
+
+# Architectural Principles
+
+## Layer Independence
+
+Each layer has exactly one responsibility.
+
+---
+
+## Dependency Direction
+
+Dependencies always point downward.
+
+Higher layers may depend on lower-layer contracts.
+
+Lower layers never depend on higher layers.
+
+---
+
+## Replaceability
+
+Every layer may be replaced independently.
+
+Examples:
+
+Replace Runtime.
+
+Agents remain unchanged.
+
+Replace Knowledge Provider.
+
+Runtime remains unchanged.
+
+Replace LLM.
+
+Architecture remains unchanged.
+
+---
+
+## AI Independence
+
+The architecture does not depend on any specific AI model.
+
+Examples:
+
+- OpenAI
+- Anthropic
+- Gemini
+- Local models
+
+All are implementation details.
+
+---
+
+## Company Independence
+
+The Runtime is reusable across organizations.
+
+Company Brain is organization-specific.
+
+---
+
+# Dependency Rules
+
+User Interfaces never execute Tools directly.
+
+Agents never access infrastructure directly.
+
+Runtime never retrieves knowledge.
+
+Capabilities never perform reasoning.
+
+Infrastructure never depends on Runtime.
+
+---
+
+# Alternatives Considered
+
+## Monolithic AI Application
+
+Rejected.
+
+Poor separation of concerns.
+
+---
+
+## LLM-Centric Architecture
+
+Rejected.
+
+LLMs are replaceable providers,
+not architectural foundations.
+
+---
+
+## Runtime-Centric Everything
+
+Rejected.
+
+Runtime should execute,
+not own intelligence.
+
+---
+
+# Consequences
+
+Positive:
+
+- clear boundaries
+- scalable architecture
+- independent evolution
+- provider independence
+- reusable Runtime
+- reusable Agents
+- easier testing
+- long-term maintainability
+
+Negative:
+
+- additional architectural complexity
+- more contracts
+- more documentation
+
+These costs are justified for an AI Operating System.
+
+---
+
+# Future Evolution
+
+Future architectural layers may include:
+
+- Security
+- Governance
+- Observability
+- Distributed Runtime
+- Marketplace
+- Enterprise Administration
+
+These extensions should integrate without changing existing layers.
+
+---
+
+# Related ADRs
+
+- ADR-0008 — Runtime Core Architecture
+- ADR-0011 — Agent Execution Model
+- ADR-0015 — Company Brain Architecture
+- ADR-0017 — Everything Is a Capability
+- ADR-0018 — Intent-Centric Architecture

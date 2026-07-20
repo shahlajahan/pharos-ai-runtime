@@ -1,0 +1,301 @@
+# ADR-0013 — Knowledge Architecture
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+The AI Operating System requires access to authoritative information.
+
+Examples include:
+
+- company policies
+- engineering standards
+- product documentation
+- architectural decisions
+- technical specifications
+- legal documentation
+- organizational structure
+
+This information differs fundamentally from Memory.
+
+Memory contains experiences accumulated over time.
+
+Knowledge represents authoritative facts.
+
+The architecture requires a clear separation between the two concepts.
+
+---
+
+# Decision
+
+Knowledge is treated as a read-oriented subsystem.
+
+Agents retrieve knowledge during reasoning.
+
+The Runtime never retrieves knowledge directly.
+
+```
+                Agent
+                  │
+                  ▼
+         Knowledge Provider
+                  │
+                  ▼
+          Knowledge Sources
+
+Agent
+    │
+    ▼
+RuntimeIntent
+    │
+    ▼
+Runtime
+```
+
+Knowledge retrieval always happens before Runtime execution.
+
+---
+
+# Knowledge Responsibilities
+
+Knowledge provides authoritative information.
+
+Examples include:
+
+- ADRs
+- Company Brain
+- Engineering Standards
+- Product Documentation
+- API Specifications
+- Operating Procedures
+- Policies
+
+Knowledge never executes work.
+
+Knowledge never stores conversations.
+
+Knowledge never performs reasoning.
+
+---
+
+# Knowledge Sources
+
+Knowledge may originate from multiple systems.
+
+Examples:
+
+- Markdown documentation
+- Git repositories
+- Internal documentation
+- Databases
+- PDFs
+- Wikis
+- Structured datasets
+
+The Agent should not depend on any particular storage technology.
+
+---
+
+# Knowledge Provider
+
+Agents interact only with a KnowledgeProvider abstraction.
+
+Examples:
+
+```
+MarkdownKnowledgeProvider
+```
+
+```
+GitKnowledgeProvider
+```
+
+```
+VectorKnowledgeProvider
+```
+
+```
+HybridKnowledgeProvider
+```
+
+The retrieval mechanism is replaceable.
+
+---
+
+# Runtime Responsibilities
+
+Runtime remains knowledge-independent.
+
+The Runtime:
+
+- does not search documentation
+- does not retrieve files
+- does not query repositories
+
+Runtime only executes RuntimeIntent.
+
+---
+
+# Agent Responsibilities
+
+Agents decide:
+
+- when knowledge is required
+- which provider to use
+- how retrieved knowledge affects reasoning
+
+Knowledge retrieval belongs entirely to the Intelligence Layer.
+
+---
+
+# Memory vs Knowledge
+
+Memory answers:
+
+> What have we experienced?
+
+Knowledge answers:
+
+> What is true?
+
+Examples:
+
+Memory:
+
+- previous conversations
+- user preferences
+- execution history
+- temporary context
+
+Knowledge:
+
+- company standards
+- ADRs
+- API documentation
+- engineering guidelines
+- product specifications
+
+These concepts must remain separate.
+
+---
+
+# Dependency Rules
+
+Runtime never depends on Knowledge.
+
+Workflow never depends on Knowledge.
+
+Knowledge Providers never depend on Runtime.
+
+Tools never modify Knowledge.
+
+Knowledge is immutable during execution.
+
+---
+
+# Architectural Principles
+
+## Source of Truth
+
+Knowledge is authoritative.
+
+Agents should prefer Knowledge over assumptions.
+
+---
+
+## Immutable During Execution
+
+Knowledge retrieval does not modify documents.
+
+Execution should never rewrite the Knowledge Base.
+
+---
+
+## Replaceable Retrieval
+
+Knowledge retrieval strategies may evolve independently.
+
+Possible implementations include:
+
+- keyword search
+- semantic search
+- vector retrieval
+- hybrid retrieval
+
+The Agent remains unchanged.
+
+---
+
+# Alternatives Considered
+
+## Merge Memory and Knowledge
+
+Rejected.
+
+The two concepts have different ownership,
+lifecycles and responsibilities.
+
+---
+
+## Runtime retrieves documentation
+
+Rejected.
+
+Knowledge retrieval belongs to reasoning,
+not execution.
+
+---
+
+## Tools own Knowledge
+
+Rejected.
+
+Knowledge is independent from external integrations.
+
+---
+
+# Consequences
+
+Positive:
+
+- clear separation of concerns
+- replaceable retrieval strategies
+- deterministic Runtime
+- scalable Company Brain
+- easier testing
+
+Negative:
+
+- additional architectural abstraction
+- separate lifecycle for Knowledge and Memory
+
+The benefits outweigh the additional complexity.
+
+---
+
+# Future Evolution
+
+Future Knowledge capabilities may include:
+
+- semantic retrieval
+- citation tracking
+- version-aware retrieval
+- document ranking
+- graph-based relationships
+- multi-repository search
+- incremental indexing
+
+The Runtime Core remains unchanged.
+
+---
+
+# Related ADRs
+
+- ADR-0008 — Runtime Core Architecture
+- ADR-0010 — Tool Execution Model
+- ADR-0011 — Agent Execution Model
+- ADR-0012 — Memory Architecture

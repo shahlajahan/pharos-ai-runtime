@@ -1,0 +1,317 @@
+# ADR-0014 — Multi-Agent Orchestration Model
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+As the AI Operating System grows, a single Agent becomes insufficient for
+handling complex tasks.
+
+Real-world requests often require expertise from multiple domains.
+
+Examples:
+
+- software engineering
+- marketing
+- legal review
+- finance
+- product management
+- customer support
+
+Combining all responsibilities into a single Agent would create a large,
+difficult-to-maintain component with conflicting objectives.
+
+The system requires a collaborative execution model.
+
+---
+
+# Decision
+
+The platform shall support multiple specialized Agents.
+
+Each Agent owns one domain of expertise.
+
+A request may involve one or more Agents.
+
+```
+User
+   │
+   ▼
+Coordinator Agent
+   │
+   ├──────────────┐
+   ▼              ▼
+Engineering     Marketing
+Agent           Agent
+   │              │
+   └──────┬───────┘
+          ▼
+      Runtime
+```
+
+Agents collaborate.
+
+Runtime executes.
+
+---
+
+# Agent Roles
+
+Every Agent has a clearly defined responsibility.
+
+Examples:
+
+- CEO Agent
+- Engineering Agent
+- Marketing Agent
+- Sales Agent
+- Finance Agent
+- Legal Agent
+- Product Agent
+- Customer Success Agent
+
+No Agent should become responsible for unrelated domains.
+
+---
+
+# Coordinator Agent
+
+The Coordinator Agent is responsible for orchestration.
+
+Responsibilities include:
+
+- understanding user requests
+- decomposing work
+- selecting appropriate Agents
+- combining results
+- resolving conflicts
+- producing the final response
+
+The Coordinator performs no execution.
+
+---
+
+# Specialist Agents
+
+Specialist Agents:
+
+- reason within their own domain
+- retrieve domain knowledge
+- use memory
+- generate RuntimeIntent
+
+They never execute work directly.
+
+Execution always belongs to Runtime.
+
+---
+
+# Runtime Responsibilities
+
+Runtime remains completely unaware of:
+
+- Agent identities
+- Agent hierarchy
+- Agent collaboration
+
+Runtime receives RuntimeIntent.
+
+Nothing more.
+
+---
+
+# Agent Communication
+
+Agents communicate through structured messages.
+
+They do not invoke each other's internal implementations.
+
+Possible message types include:
+
+- request
+- response
+- delegation
+- clarification
+- review
+
+Communication should remain implementation-independent.
+
+---
+
+# Knowledge Ownership
+
+Every Agent may have access to different knowledge.
+
+Examples:
+
+Engineering Agent:
+
+- ADRs
+- architecture
+- source code
+
+Marketing Agent:
+
+- campaigns
+- branding
+- market research
+
+Legal Agent:
+
+- regulations
+- contracts
+- compliance
+
+Knowledge access is domain-specific.
+
+---
+
+# Memory Ownership
+
+Each Agent maintains its own reasoning context.
+
+Shared memory may exist but is not required.
+
+Agents should avoid mutating another Agent's memory directly.
+
+---
+
+# Dependency Rules
+
+Agents never depend on Runtime implementations.
+
+Runtime never depends on Agents.
+
+Agents communicate only through contracts.
+
+Specialist Agents never coordinate execution.
+
+Coordinator Agent never performs execution.
+
+---
+
+# Architectural Principles
+
+## Domain Specialization
+
+One Agent.
+
+One domain.
+
+One responsibility.
+
+---
+
+## Independent Evolution
+
+Each Agent evolves independently.
+
+Adding a new Agent should not require modifying existing Agents.
+
+---
+
+## Replaceable Agents
+
+Any Agent implementation may be replaced without changing Runtime.
+
+Examples:
+
+EngineeringAgentV1
+
+↓
+
+EngineeringAgentV2
+
+↓
+
+EngineeringLLMAgent
+
+---
+
+## Stateless Runtime
+
+Runtime remains identical regardless of the number of Agents.
+
+---
+
+# Alternatives Considered
+
+## Single Universal Agent
+
+Rejected.
+
+Too many responsibilities.
+
+Poor scalability.
+
+Difficult testing.
+
+---
+
+## Runtime coordinates Agents
+
+Rejected.
+
+Coordination belongs to intelligence.
+
+Execution belongs to Runtime.
+
+---
+
+## Agents execute Tools directly
+
+Rejected.
+
+Execution must remain centralized.
+
+---
+
+# Consequences
+
+Positive:
+
+- domain specialization
+- scalable architecture
+- independent evolution
+- cleaner prompts
+- easier testing
+- future autonomous collaboration
+
+Negative:
+
+- additional orchestration layer
+- more message passing
+- increased architectural complexity
+
+The long-term benefits justify the complexity.
+
+---
+
+# Future Evolution
+
+Future versions may support:
+
+- dynamic Agent discovery
+- Agent capability negotiation
+- hierarchical delegation
+- peer-to-peer collaboration
+- voting and consensus
+- self-critique
+- autonomous planning
+- distributed Agent execution
+
+The Runtime Core remains unchanged.
+
+---
+
+# Related ADRs
+
+- ADR-0008 — Runtime Core Architecture
+- ADR-0010 — Tool Execution Model
+- ADR-0011 — Agent Execution Model
+- ADR-0012 — Memory Architecture
+- ADR-0013 — Knowledge Architecture

@@ -1,0 +1,346 @@
+# ADR-0015 — Company Brain Architecture
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+Pharos AI Operating System is designed to assist a real company.
+
+The platform requires a permanent source of organizational truth.
+
+Examples include:
+
+- company structure
+- engineering standards
+- architectural decisions
+- products
+- services
+- business processes
+- legal policies
+- operational procedures
+- historical decisions
+
+This information must exist independently from:
+
+- Runtime
+- Agents
+- Memory
+- LLM providers
+
+A dedicated architecture is required.
+
+---
+
+# Decision
+
+The Company Brain is the authoritative representation of the organization.
+
+It acts as the canonical source of organizational knowledge.
+
+```
+                Company Brain
+                       │
+                       ▼
+             Knowledge Providers
+                       │
+                       ▼
+                  AI Agents
+                       │
+                       ▼
+                 RuntimeIntent
+                       │
+                       ▼
+                    Runtime
+```
+
+The Company Brain never performs execution.
+
+The Company Brain never performs reasoning.
+
+It stores truth.
+
+---
+
+# Purpose
+
+The Company Brain represents the organization itself.
+
+It answers questions such as:
+
+- What products exist?
+- How is the engineering department organized?
+- Which architectural decisions have been accepted?
+- What are the company standards?
+- How should releases be performed?
+- Which domains belong to the company?
+- Which policies are active?
+
+---
+
+# Responsibilities
+
+The Company Brain owns:
+
+- company documentation
+- ADRs
+- engineering standards
+- operational standards
+- product documentation
+- organizational structure
+- departments
+- employee roles
+- company policies
+- company history
+- company assets
+
+The Company Brain does not own:
+
+- conversations
+- prompts
+- execution
+- planning
+- reasoning
+- temporary state
+
+---
+
+# Relationship to Runtime
+
+Runtime never accesses Company Brain directly.
+
+Runtime receives RuntimeIntent only.
+
+The Runtime remains company-independent.
+
+The same Runtime should be usable by any organization.
+
+---
+
+# Relationship to Agents
+
+Agents retrieve organizational information through
+Knowledge Providers.
+
+Agents interpret Company Brain.
+
+Agents never modify Company Brain during execution.
+
+---
+
+# Relationship to Knowledge
+
+Knowledge Providers expose Company Brain.
+
+The Company Brain is the source.
+
+Knowledge Providers are retrieval mechanisms.
+
+Examples:
+
+```
+Markdown Provider
+
+↓
+
+Company Brain
+```
+
+```
+Git Provider
+
+↓
+
+Company Brain
+```
+
+```
+Vector Provider
+
+↓
+
+Company Brain
+```
+
+Changing providers never changes Company Brain.
+
+---
+
+# Relationship to Memory
+
+Memory represents experience.
+
+Company Brain represents organizational truth.
+
+Examples:
+
+Memory:
+
+- user prefers concise responses
+- previous conversation
+- completed workflow
+- temporary project context
+
+Company Brain:
+
+- engineering standards
+- architecture
+- policies
+- products
+- company structure
+
+Memory is dynamic.
+
+Company Brain changes intentionally through governance.
+
+---
+
+# Governance
+
+Changes to Company Brain are deliberate.
+
+Examples include:
+
+- approving an ADR
+- publishing a new engineering standard
+- updating product documentation
+- changing company policies
+
+Routine AI execution must not mutate Company Brain.
+
+---
+
+# Architectural Principles
+
+## Single Source of Truth
+
+Every organizational fact exists in one canonical place.
+
+---
+
+## Runtime Independence
+
+Runtime never embeds company knowledge.
+
+---
+
+## AI Independence
+
+Company Brain exists independently from any AI model.
+
+LLMs may consume Company Brain.
+
+They never become the source of truth.
+
+---
+
+## Technology Independence
+
+The Company Brain is independent from storage technology.
+
+Possible implementations include:
+
+- Markdown
+- Git
+- Database
+- Object Storage
+- Hybrid systems
+
+Architecture remains unchanged.
+
+---
+
+# Dependency Rules
+
+Company Brain depends on nothing.
+
+Knowledge Providers depend on Company Brain.
+
+Agents depend on Knowledge Providers.
+
+Runtime depends on neither.
+
+Tools never modify Company Brain directly.
+
+Memory never replaces Company Brain.
+
+---
+
+# Alternatives Considered
+
+## Embed company knowledge into prompts
+
+Rejected.
+
+Knowledge becomes duplicated,
+difficult to maintain,
+and impossible to govern.
+
+---
+
+## Store company knowledge in Memory
+
+Rejected.
+
+Memory is contextual.
+
+Company Brain is authoritative.
+
+---
+
+## Runtime reads Company Brain
+
+Rejected.
+
+Execution should remain independent from organizational knowledge.
+
+---
+
+# Consequences
+
+Positive:
+
+- single organizational truth
+- deterministic Runtime
+- reusable AI infrastructure
+- replaceable LLM providers
+- governed documentation
+- easier auditing
+- scalable knowledge management
+
+Negative:
+
+- additional architectural subsystem
+- governance process required
+
+The benefits significantly outweigh the operational cost.
+
+---
+
+# Future Evolution
+
+Future Company Brain capabilities may include:
+
+- semantic indexing
+- graph relationships
+- version history
+- document ownership
+- approval workflows
+- automated consistency checks
+- organizational analytics
+- AI-assisted documentation
+
+None of these require changes to Runtime.
+
+---
+
+# Related ADRs
+
+- ADR-0008 — Runtime Core Architecture
+- ADR-0011 — Agent Execution Model
+- ADR-0012 — Memory Architecture
+- ADR-0013 — Knowledge Architecture
+- ADR-0014 — Multi-Agent Orchestration Model

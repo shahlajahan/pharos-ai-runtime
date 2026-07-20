@@ -1,0 +1,418 @@
+# ADR-0008 — Runtime Core Architecture
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+Pharos is being designed as a modular AI Operating System rather than a
+single AI assistant.
+
+The Runtime is responsible for executing user intent independently from
+company-specific knowledge, AI providers, tools, memory systems, or product
+logic.
+
+As the Runtime evolved, multiple architectural components were introduced:
+
+- RuntimeIntent
+- RuntimeEngine
+- RuntimePlanner
+- RuntimePlan
+- WorkflowBuilder
+- Workflow
+- WorkflowResult
+
+Although each component had a well-defined responsibility, the overall
+Runtime architecture was not yet documented as a single decision.
+
+Without an explicit architecture, future work on:
+
+- LLM planning
+- Tool execution
+- Memory
+- Multi-agent systems
+- Knowledge retrieval
+
+could introduce unnecessary coupling and blur the responsibilities of each
+layer.
+
+This ADR establishes the Runtime Core as the stable foundation of the
+Pharos AI Operating System.
+
+---
+
+# Decision
+
+The Runtime shall be implemented as a deterministic execution pipeline where
+each component owns exactly one responsibility.
+
+The Runtime Core consists of seven layers:
+
+```
+RuntimeIntent
+        │
+        ▼
+RuntimeEngine
+        │
+        ▼
+RuntimePlanner
+        │
+        ▼
+PlanningResult
+        │
+        ▼
+RuntimePlan
+        │
+        ▼
+WorkflowBuilder
+        │
+        ▼
+Workflow
+        │
+        ▼
+WorkflowResult
+```
+
+Each layer communicates only with its direct neighbour.
+
+No component may bypass another layer.
+
+---
+
+# Responsibilities
+
+## RuntimeIntent
+
+Represents the execution request.
+
+It is immutable.
+
+It contains only the information required to describe the user's intent.
+
+It contains no execution logic.
+
+---
+
+## RuntimeEngine
+
+The public entry point of the Runtime.
+
+Responsibilities:
+
+- receive RuntimeIntent
+- coordinate execution
+- invoke RuntimePlanner
+- invoke WorkflowBuilder
+- execute the Workflow
+- return WorkflowResult
+
+The RuntimeEngine contains no planning logic.
+
+The RuntimeEngine contains no workflow construction logic.
+
+---
+
+## RuntimePlanner
+
+Transforms RuntimeIntent into RuntimePlan.
+
+Responsibilities:
+
+- planning
+- decomposition
+- analysis
+- future AI planning
+
+The planner never executes work.
+
+Different planner implementations may exist:
+
+- DefaultRuntimePlanner
+- RuleBasedRuntimePlanner
+- HybridRuntimePlanner
+- LLMRuntimePlanner
+
+---
+
+## PlanningResult
+
+Wraps the output produced by RuntimePlanner.
+
+Currently contains:
+
+- RuntimePlan
+
+Future versions may include:
+
+- diagnostics
+- confidence
+- planner metadata
+
+---
+
+## RuntimePlan
+
+Represents the execution plan.
+
+Current version contains:
+
+- id
+- title
+
+Future versions may include:
+
+- goals
+- ordered steps
+- constraints
+- dependencies
+- execution metadata
+
+RuntimePlan is intentionally execution-independent.
+
+---
+
+## WorkflowBuilder
+
+Transforms RuntimePlan into Workflow.
+
+It is responsible only for workflow construction.
+
+It performs no execution.
+
+---
+
+## Workflow
+
+Represents executable work.
+
+A Workflow encapsulates execution behaviour independently from planning.
+
+Different Workflow implementations may exist depending on the execution
+strategy.
+
+---
+
+## WorkflowResult
+
+Represents the outcome of execution.
+
+The Runtime always returns WorkflowResult.
+
+Future versions may include:
+
+- outputs
+- artifacts
+- execution statistics
+- diagnostics
+
+---
+
+# Dependency Rules
+
+RuntimeIntent has no Runtime dependencies.
+
+RuntimeEngine depends only on contracts.
+
+RuntimePlanner never depends on Workflow.
+
+WorkflowBuilder never depends on Planner implementations.
+
+Workflow never depends on Planner.
+
+RuntimePlan never depends on Workflow.
+
+Execution never depends on Company.
+
+Company never depends on Runtime implementations.
+
+Runtime remains completely independent from:
+
+- HQ
+- Products
+- Employees
+- Marketing
+- Business logic
+
+---
+
+# Architectural Principles
+
+The Runtime follows the following principles:
+
+## Single Responsibility
+
+Every Runtime component owns exactly one responsibility.
+
+No class combines planning, workflow construction and execution.
+
+---
+
+## Dependency Inversion
+
+The Runtime depends on contracts rather than implementations.
+
+Concrete implementations are injected.
+
+---
+
+## Deterministic Bootstrap
+
+The Runtime can execute without:
+
+- AI
+- LLM
+- Memory
+- Tool Registry
+- Knowledge Base
+
+The default implementation consists of:
+
+```
+DefaultRuntimeEngine
+
+↓
+
+DefaultRuntimePlanner
+
+↓
+
+DefaultWorkflowBuilder
+
+↓
+
+MinimalWorkflow
+```
+
+This deterministic bootstrap enables testing and provides a stable Runtime
+foundation.
+
+---
+
+## Progressive Intelligence
+
+Artificial Intelligence is an extension of Runtime,
+not its foundation.
+
+Future AI components replace contracts without changing the Runtime Core.
+
+Examples:
+
+```
+DefaultRuntimePlanner
+
+↓
+
+LLMRuntimePlanner
+```
+
+```
+MinimalWorkflow
+
+↓
+
+ToolWorkflow
+```
+
+```
+LocalMemory
+
+↓
+
+DistributedMemory
+```
+
+The Runtime architecture remains unchanged.
+
+---
+
+# Alternatives Considered
+
+## Planner executes directly
+
+Rejected.
+
+Planning and execution are separate concerns.
+
+---
+
+## RuntimePlan executes itself
+
+Rejected.
+
+A plan is data.
+
+Execution belongs to Workflow.
+
+---
+
+## WorkflowBuilder omitted
+
+Rejected.
+
+Separating planning from execution allows multiple execution models without
+changing planners.
+
+---
+
+## Runtime coupled to AI providers
+
+Rejected.
+
+The Runtime must remain provider-agnostic.
+
+LLMs are plugins, not architectural dependencies.
+
+---
+
+# Consequences
+
+Positive:
+
+- highly testable
+- deterministic bootstrap
+- replaceable planners
+- replaceable workflows
+- clean separation of concerns
+- provider independence
+- suitable for multi-agent evolution
+
+Negative:
+
+- additional architectural layers
+- slightly higher abstraction cost
+- more interfaces than a minimal application
+
+These costs are considered acceptable for an AI Operating System.
+
+---
+
+# Future Evolution
+
+The Runtime Core defined in this ADR is considered stable.
+
+Future development should extend—not redesign—the architecture.
+
+Planned extensions include:
+
+- Execution Strategies
+- Tool Registry
+- RuntimePlan enrichment
+- LLM planners
+- Memory providers
+- Knowledge providers
+- Agent Runtime
+- Multi-agent orchestration
+
+None of these extensions should require changes to the Runtime Core
+architecture defined by this ADR.
+
+---
+
+# Related ADRs
+
+- ADR-0003 — Execution Strategy
+- ADR-0006 — Runtime Planning Pipeline
+- ADR-0007 — Streaming API Design

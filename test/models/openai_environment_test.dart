@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 Map<String, String> _validEnvironment({String? organization}) {
   final environment = {
     'OPENAI_API_KEY': 'sk-test-key',
-    'OPENAI_BASE_URL': 'https://api.openai.com/v1/chat/completions',
+    'OPENAI_BASE_URL': 'https://api.openai.com/v1',
     'OPENAI_MODEL': 'gpt-4',
     'OPENAI_TEMPERATURE': '0.7',
   };
@@ -21,7 +21,7 @@ void main() {
     final environment = OpenAIEnvironment.fromMap(_validEnvironment());
 
     expect(environment.apiKey, 'sk-test-key');
-    expect(environment.baseUrl, 'https://api.openai.com/v1/chat/completions');
+    expect(environment.baseUrl, 'https://api.openai.com/v1');
     expect(environment.model, 'gpt-4');
     expect(environment.temperature, 0.7);
   });
@@ -77,7 +77,7 @@ void main() {
   test('fromMap() preserves values exactly without trimming', () {
     final map = {
       'OPENAI_API_KEY': '  sk-test-key  ',
-      'OPENAI_BASE_URL': ' https://api.openai.com/v1/chat/completions ',
+      'OPENAI_BASE_URL': ' https://api.openai.com/v1 ',
       'OPENAI_MODEL': ' gpt-4 ',
       'OPENAI_TEMPERATURE': '0.7',
       'OPENAI_ORGANIZATION': ' org-123 ',
@@ -86,7 +86,7 @@ void main() {
     final environment = OpenAIEnvironment.fromMap(map);
 
     expect(environment.apiKey, '  sk-test-key  ');
-    expect(environment.baseUrl, ' https://api.openai.com/v1/chat/completions ');
+    expect(environment.baseUrl, ' https://api.openai.com/v1 ');
     expect(environment.model, ' gpt-4 ');
     expect(environment.organization, ' org-123 ');
   });

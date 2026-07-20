@@ -99,5 +99,9 @@ void main(List<String> arguments) async {
     return;
   }
 
-  await const ExecutionPipeline(config: Config(), logger: logger).run(agent);
+  await ExecutionPipeline(
+    config: const Config(),
+    logger: logger,
+    modelProvider: provider,
+  ).run(agent);
 }

@@ -1,0 +1,308 @@
+# ADR-0018 — Intent-Centric Architecture
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+Many AI frameworks are built around conversations, prompts or messages.
+
+Their execution pipelines typically begin with conversational artifacts such
+as:
+
+- chat history
+- user messages
+- prompts
+- conversation state
+
+This tightly couples the execution engine to a conversational interface.
+
+Pharos AI Operating System is intended to support far more than chat.
+
+Examples include:
+
+- APIs
+- background jobs
+- scheduled workflows
+- autonomous agents
+- mobile applications
+- IDE integrations
+- command line interfaces
+- event-driven systems
+
+A conversation should therefore be considered one possible input—not the
+foundation of the architecture.
+
+---
+
+# Decision
+
+Intent is the universal execution primitive of the platform.
+
+Every execution request must ultimately be represented as a RuntimeIntent.
+
+Conversation is one possible producer of RuntimeIntent.
+
+It is not the execution model.
+
+```
+Conversation
+        │
+        ▼
+
+ API Request
+        │
+        ▼
+
+ Scheduled Task
+        │
+        ▼
+
+ Autonomous Agent
+        │
+        ▼
+
+ Event Trigger
+        │
+        ▼
+
+ RuntimeIntent
+        │
+        ▼
+
+ Runtime
+```
+
+The Runtime never executes conversations.
+
+It executes intents.
+
+---
+
+# RuntimeIntent
+
+RuntimeIntent represents executable intent.
+
+It contains only the information required for execution.
+
+Examples include:
+
+- objective
+- constraints
+- metadata
+- execution preferences
+
+RuntimeIntent never contains UI concepts.
+
+Examples of UI concepts:
+
+- chat messages
+- prompt formatting
+- markdown rendering
+- conversation history
+
+These belong to higher layers.
+
+---
+
+# Producers
+
+RuntimeIntent may be created by many different producers.
+
+Examples:
+
+- Chat Agent
+- REST API
+- CLI
+- Scheduler
+- Event Bus
+- Another Agent
+- Workflow
+- External Automation
+
+The Runtime treats every producer identically.
+
+---
+
+# Runtime Responsibilities
+
+The Runtime accepts RuntimeIntent.
+
+It does not know:
+
+- where the intent originated
+- who created it
+- whether it came from a human
+- whether it came from another AI
+
+Execution remains origin-independent.
+
+---
+
+# Conversation Layer
+
+Conversation is an application concern.
+
+Conversation systems are responsible for:
+
+- parsing messages
+- maintaining chat history
+- user interaction
+- formatting responses
+
+Conversation systems eventually produce RuntimeIntent.
+
+---
+
+# Agent Responsibilities
+
+Agents transform information into intent.
+
+Agents may use:
+
+- Memory
+- Knowledge
+- Tools
+- Reasoning
+
+The output of reasoning is RuntimeIntent.
+
+---
+
+# Architectural Principles
+
+## Intent Is Universal
+
+Everything executable becomes RuntimeIntent.
+
+No exceptions.
+
+---
+
+## Conversation Independence
+
+Removing chat support must not require changes to Runtime.
+
+Adding voice support must not require changes to Runtime.
+
+Adding scheduled execution must not require changes to Runtime.
+
+---
+
+## Transport Independence
+
+RuntimeIntent is independent from transport protocols.
+
+Possible transports include:
+
+- HTTP
+- WebSocket
+- CLI
+- gRPC
+- Message Queue
+- Local API
+
+Runtime remains unchanged.
+
+---
+
+## Human and AI Equality
+
+The Runtime makes no distinction between:
+
+- human-generated intent
+- AI-generated intent
+- scheduled intent
+- event-generated intent
+
+All are executed identically.
+
+---
+
+# Dependency Rules
+
+Runtime depends only on RuntimeIntent.
+
+Conversation depends on Runtime.
+
+Runtime never depends on conversation.
+
+Agents never expose conversation objects to Runtime.
+
+---
+
+# Alternatives Considered
+
+## Conversation-Centric Runtime
+
+Rejected.
+
+This prevents Runtime reuse outside chat applications.
+
+---
+
+## Prompt-Centric Runtime
+
+Rejected.
+
+Prompts are implementation details of LLMs.
+
+They are not execution primitives.
+
+---
+
+## API-Specific Runtime
+
+Rejected.
+
+Execution should remain transport-independent.
+
+---
+
+# Consequences
+
+Positive:
+
+- reusable Runtime
+- transport independence
+- chat independence
+- API-first architecture
+- automation-friendly
+- event-driven support
+- future-proof execution model
+
+Negative:
+
+- requires an explicit translation layer
+- application developers must generate RuntimeIntent
+
+The architectural benefits significantly outweigh the additional layer.
+
+---
+
+# Future Evolution
+
+Future producers may include:
+
+- robotic systems
+- IoT devices
+- autonomous companies
+- operating systems
+- distributed AI networks
+
+All ultimately produce RuntimeIntent.
+
+The Runtime Core remains unchanged.
+
+---
+
+# Related ADRs
+
+- ADR-0008 — Runtime Core Architecture
+- ADR-0011 — Agent Execution Model
+- ADR-0014 — Multi-Agent Orchestration Model
+- ADR-0015 — Company Brain Architecture
+- ADR-0017 — Everything Is a Capability

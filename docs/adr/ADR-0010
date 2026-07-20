@@ -1,0 +1,262 @@
+# ADR-0010 — Tool Execution Model
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+The Runtime is designed to execute user intent.
+
+Many intents require interaction with external systems.
+
+Examples include:
+
+- reading files
+- searching knowledge
+- sending email
+- creating calendar events
+- calling APIs
+- executing shell commands
+- interacting with databases
+- browsing the web
+
+Embedding these capabilities directly into RuntimeEngine,
+RuntimePlanner or Workflow would tightly couple the Runtime to specific
+implementations and make testing difficult.
+
+The Runtime therefore requires a dedicated Tool abstraction.
+
+---
+
+# Decision
+
+All external capabilities shall be represented as Runtime Tools.
+
+The Runtime itself never performs external work directly.
+
+Instead, Workflows invoke Tool contracts.
+
+```
+RuntimeIntent
+        │
+        ▼
+RuntimePlanner
+        │
+        ▼
+RuntimePlan
+        │
+        ▼
+WorkflowBuilder
+        │
+        ▼
+Workflow
+        │
+        ▼
+Tool
+        │
+        ▼
+External System
+```
+
+The Runtime is responsible for orchestration.
+
+Tools are responsible for integration.
+
+---
+
+# Tool Responsibilities
+
+A Tool represents one executable capability.
+
+Examples:
+
+- ReadFileTool
+- SearchKnowledgeTool
+- SendEmailTool
+- CalendarTool
+- HttpTool
+- GitTool
+- DatabaseTool
+
+Each Tool owns only one capability.
+
+---
+
+# Tool Contract
+
+Every Tool shall expose a common interface.
+
+Conceptually:
+
+```text
+execute(input)
+
+↓
+
+ToolResult
+```
+
+The Runtime never depends on concrete Tool implementations.
+
+---
+
+# Tool Registry
+
+Tool discovery is delegated to ToolRegistry.
+
+The Runtime never constructs tools directly.
+
+```
+Workflow
+
+↓
+
+ToolRegistry
+
+↓
+
+Tool
+```
+
+ToolRegistry is responsible for:
+
+- registration
+- lookup
+- availability
+- dependency injection
+
+---
+
+# Runtime Responsibilities
+
+The Runtime:
+
+- selects work
+- builds workflows
+- coordinates execution
+
+The Runtime never:
+
+- sends HTTP directly
+- reads files directly
+- accesses databases directly
+- invokes external APIs directly
+
+Those responsibilities belong to Tools.
+
+---
+
+# Dependency Rules
+
+Workflow depends only on Tool contracts.
+
+Tool implementations never depend on RuntimeEngine.
+
+RuntimePlanner never depends on Tool implementations.
+
+RuntimePlan contains no Tool instances.
+
+---
+
+# Tool Independence
+
+Tools are independent modules.
+
+Removing one Tool must not affect the Runtime.
+
+Adding a new Tool requires no Runtime modification.
+
+---
+
+# Error Handling
+
+Tool failures are reported through ToolResult.
+
+The Runtime decides how to react.
+
+Tools never decide Runtime behaviour.
+
+---
+
+# Security
+
+Tools are the Runtime's security boundary.
+
+Permissions, validation and external access policies belong to Tool
+implementations.
+
+The Runtime assumes Tools enforce their own operational constraints.
+
+---
+
+# Alternatives Considered
+
+## Runtime executes integrations directly
+
+Rejected.
+
+This tightly couples orchestration to infrastructure.
+
+---
+
+## Planner invokes Tools
+
+Rejected.
+
+Planning should remain deterministic and side-effect free.
+
+---
+
+## RuntimePlan stores Tool instances
+
+Rejected.
+
+RuntimePlan is data only.
+
+---
+
+# Consequences
+
+Positive:
+
+- modular integrations
+- provider independence
+- isolated testing
+- replaceable implementations
+- clear security boundary
+
+Negative:
+
+- one additional abstraction
+- ToolRegistry becomes required infrastructure
+
+The architectural benefits outweigh the additional complexity.
+
+---
+
+# Future Evolution
+
+Future Runtime versions may support:
+
+- dynamic Tool loading
+- remote Tools
+- MCP-compatible Tools
+- permission-aware Tools
+- Tool capability discovery
+- Tool version negotiation
+- sandboxed execution
+- distributed Tool execution
+
+None of these extensions require changes to RuntimeEngine.
+
+---
+
+# Related ADRs
+
+- ADR-0003 — Execution Strategy
+- ADR-0006 — Runtime Planning Pipeline
+- ADR-0008 — Runtime Core Architecture
+- ADR-0009 — Workflow Execution Model

@@ -16,13 +16,24 @@ class HttpOpenAIClient extends OpenAIClient {
 
   final HttpTransport _transport;
 
+  /// Builds the chat completions endpoint from [baseUrl], the
+  /// OpenAI-compatible API root (for example `https://openrouter.ai/api/v1`
+  /// or `https://api.openai.com/v1`) — never the full endpoint itself.
+  Uri _chatCompletionsUri(String baseUrl) {
+    final root = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+
+    return Uri.parse('$root/chat/completions');
+  }
+
   @override
   Future<OpenAIResult> complete(
     ModelRequest request,
     ModelConfig modelConfig,
     OpenAIConfig openAiConfig,
   ) async {
-    final uri = Uri.parse(openAiConfig.baseUrl);
+    final uri = _chatCompletionsUri(openAiConfig.baseUrl);
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -105,7 +116,7 @@ class HttpOpenAIClient extends OpenAIClient {
     ModelConfig modelConfig,
     OpenAIConfig openAiConfig,
   ) async {
-    final uri = Uri.parse(openAiConfig.baseUrl);
+    final uri = _chatCompletionsUri(openAiConfig.baseUrl);
 
     final headers = <String, String>{
       'Content-Type': 'application/json',

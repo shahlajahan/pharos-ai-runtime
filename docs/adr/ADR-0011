@@ -1,0 +1,244 @@
+# ADR-0011 — Agent Execution Model
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+The Runtime is responsible for executing work.
+
+It is intentionally unaware of:
+
+- conversations
+- users
+- memory
+- company knowledge
+- business objectives
+- reasoning
+
+These responsibilities belong to an Agent.
+
+An architectural boundary is required between reasoning and execution.
+
+Without such a boundary, Runtime would gradually absorb AI-specific logic,
+making it difficult to test, replace, and evolve.
+
+---
+
+# Decision
+
+Agents are responsible for reasoning.
+
+The Runtime is responsible for execution.
+
+```
+User
+    │
+    ▼
+Agent
+    │
+    ▼
+RuntimeIntent
+    │
+    ▼
+Runtime
+    │
+    ▼
+WorkflowResult
+    │
+    ▼
+Agent
+```
+
+The Agent decides **what** should happen.
+
+The Runtime decides **how** to execute it.
+
+---
+
+# Agent Responsibilities
+
+An Agent may:
+
+- understand user requests
+- reason
+- retrieve memory
+- retrieve knowledge
+- choose tools
+- delegate work
+- generate RuntimeIntent
+- interpret Runtime results
+
+An Agent never performs execution directly.
+
+---
+
+# Runtime Responsibilities
+
+The Runtime:
+
+- receives RuntimeIntent
+- plans execution
+- builds workflows
+- executes workflows
+- returns WorkflowResult
+
+The Runtime never performs reasoning.
+
+---
+
+# RuntimeIntent
+
+RuntimeIntent is the only contract shared between Agent and Runtime.
+
+It represents executable intent.
+
+The Runtime never receives conversations,
+prompts,
+or chat history.
+
+---
+
+# Agent Independence
+
+Different Agent implementations may exist.
+
+Examples:
+
+- ChatAgent
+- CEOAgent
+- MarketingAgent
+- CodingAgent
+- CustomerSupportAgent
+
+Every Agent produces RuntimeIntent.
+
+The Runtime treats all intents equally.
+
+---
+
+# Memory
+
+Memory belongs to Agents.
+
+The Runtime never queries memory directly.
+
+```
+Agent
+
+↓
+
+Memory
+
+↓
+
+RuntimeIntent
+
+↓
+
+Runtime
+```
+
+---
+
+# Knowledge
+
+Knowledge retrieval belongs to Agents.
+
+Runtime executes.
+
+Agents think.
+
+---
+
+# Tool Selection
+
+Tool selection belongs to Agents and Planning.
+
+Tool execution belongs to Runtime.
+
+---
+
+# Dependency Rules
+
+Runtime never depends on Agent.
+
+Agent depends on Runtime contracts.
+
+RuntimeEngine has no knowledge of Agent implementations.
+
+Agent never executes Workflows directly.
+
+---
+
+# Alternatives Considered
+
+## Runtime performs reasoning
+
+Rejected.
+
+Reasoning and execution have different lifecycles.
+
+---
+
+## Runtime owns memory
+
+Rejected.
+
+Memory belongs to intelligence,
+not execution.
+
+---
+
+## Agent executes tools directly
+
+Rejected.
+
+Execution must remain centralized inside Runtime.
+
+---
+
+# Consequences
+
+Positive:
+
+- clean separation between AI and execution
+- reusable Runtime
+- multiple Agent implementations
+- easier testing
+- future multi-agent support
+
+Negative:
+
+- additional abstraction
+- Agent layer required before execution
+
+These costs are acceptable for long-term scalability.
+
+---
+
+# Future Evolution
+
+Future Agent capabilities may include:
+
+- long-term memory
+- planning refinement
+- reflection
+- self-evaluation
+- delegation
+- collaboration
+- autonomous execution
+
+None of these require changes to Runtime Core.
+
+---
+
+# Related ADRs
+
+- ADR-0006 — Runtime Planning Pipeline
+- ADR-0008 — Runtime Core Architecture
+- ADR-0009 — Workflow Execution Model
+- ADR-0010 — Tool Execution Model

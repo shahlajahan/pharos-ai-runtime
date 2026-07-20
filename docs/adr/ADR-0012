@@ -1,0 +1,307 @@
+# ADR-0012 — Memory Architecture
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+As the AI Operating System evolves, Agents require memory to perform
+effective reasoning.
+
+Memory enables an Agent to:
+
+- remember previous interactions
+- preserve long-term context
+- recall user preferences
+- store intermediate reasoning
+- maintain continuity across sessions
+
+Without a dedicated Memory architecture, memory access would become
+distributed across Runtime, Tools and Agents, leading to tight coupling
+and inconsistent behaviour.
+
+A clear ownership model is required.
+
+---
+
+# Decision
+
+Memory belongs to the Intelligence Layer.
+
+The Runtime remains completely stateless.
+
+```
+                Agent
+                  │
+                  ▼
+          Memory Provider
+                  │
+                  ▼
+             Memory Store
+
+Agent
+    │
+    ▼
+RuntimeIntent
+    │
+    ▼
+Runtime
+```
+
+The Runtime never accesses memory directly.
+
+Only Agents interact with Memory.
+
+---
+
+# Memory Responsibilities
+
+Memory is responsible for storing and retrieving information required for
+reasoning.
+
+Typical examples include:
+
+- previous conversations
+- user preferences
+- project state
+- intermediate plans
+- learned facts
+- execution summaries
+
+Memory does not execute work.
+
+Memory does not perform reasoning.
+
+---
+
+# Agent Responsibilities
+
+Agents decide:
+
+- what should be remembered
+- when to retrieve memory
+- how retrieved memory influences reasoning
+
+Memory never initiates behaviour.
+
+---
+
+# Runtime Responsibilities
+
+The Runtime executes RuntimeIntent exactly as received.
+
+The Runtime never:
+
+- retrieves memory
+- stores memory
+- updates memory
+- indexes memory
+
+Execution remains deterministic.
+
+---
+
+# Memory Types
+
+The architecture supports multiple logical memory categories.
+
+## Working Memory
+
+Short-lived information required during a single reasoning session.
+
+Examples:
+
+- current objective
+- temporary plans
+- intermediate reasoning
+
+---
+
+## Session Memory
+
+Context preserved throughout a conversation.
+
+Examples:
+
+- user instructions
+- active project
+- temporary preferences
+
+---
+
+## Long-Term Memory
+
+Persistent knowledge accumulated over time.
+
+Examples:
+
+- user preferences
+- architectural decisions
+- recurring workflows
+- organizational knowledge
+
+---
+
+## Episodic Memory
+
+Historical records of completed work.
+
+Examples:
+
+- completed tasks
+- execution history
+- previous solutions
+- project milestones
+
+---
+
+# Memory Provider
+
+Agents never communicate directly with storage systems.
+
+Instead they depend on a MemoryProvider abstraction.
+
+Examples:
+
+```
+LocalMemoryProvider
+
+↓
+
+SQLite
+```
+
+```
+CloudMemoryProvider
+
+↓
+
+Firestore
+```
+
+```
+VectorMemoryProvider
+
+↓
+
+Embedding Database
+```
+
+The Agent remains unchanged.
+
+---
+
+# Dependency Rules
+
+Runtime never depends on Memory.
+
+Workflow never depends on Memory.
+
+Tools never modify Memory directly.
+
+Memory implementations never depend on RuntimeEngine.
+
+Memory Providers are infrastructure components.
+
+---
+
+# Architectural Principles
+
+## Stateless Runtime
+
+Execution should remain reproducible.
+
+Removing Memory must not prevent Runtime execution.
+
+---
+
+## Replaceable Storage
+
+Changing storage technology must not affect Agents.
+
+---
+
+## Separation of Reasoning and Storage
+
+Memory stores information.
+
+Agents interpret information.
+
+Storage never performs reasoning.
+
+---
+
+# Alternatives Considered
+
+## Runtime owns Memory
+
+Rejected.
+
+Memory is required for reasoning,
+not execution.
+
+---
+
+## Tools write Memory
+
+Rejected.
+
+Tools perform external work.
+
+Agents decide what is worth remembering.
+
+---
+
+## Global Singleton Memory
+
+Rejected.
+
+Global mutable state complicates testing and scaling.
+
+---
+
+# Consequences
+
+Positive:
+
+- deterministic Runtime
+- replaceable storage
+- cleaner Agent implementations
+- scalable long-term memory
+- easier testing
+
+Negative:
+
+- one additional abstraction
+- Agents become responsible for memory management
+
+These costs are acceptable.
+
+---
+
+# Future Evolution
+
+Future Memory capabilities may include:
+
+- semantic retrieval
+- vector search
+- automatic summarization
+- memory compression
+- temporal decay
+- confidence scoring
+- conflict resolution
+- distributed memory synchronization
+
+The Runtime Core remains unchanged.
+
+---
+
+# Related ADRs
+
+- ADR-0008 — Runtime Core Architecture
+- ADR-0009 — Workflow Execution Model
+- ADR-0010 — Tool Execution Model
+- ADR-0011 — Agent Execution Model

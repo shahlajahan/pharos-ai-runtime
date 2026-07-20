@@ -1,0 +1,310 @@
+# ADR-0017 — Everything Is a Capability
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+As the platform evolves, new functionality is continuously introduced.
+
+Examples include:
+
+- Runtime Tools
+- AI Agents
+- Knowledge Providers
+- Memory Providers
+- Execution Strategies
+- Plugins
+- Integrations
+
+If each subsystem introduces its own registration,
+discovery and loading mechanism, the platform gradually becomes fragmented.
+
+Different modules would expose different extension models,
+making the system difficult to evolve.
+
+A single architectural abstraction is required.
+
+---
+
+# Decision
+
+Everything that extends the platform shall be represented as a Capability.
+
+A Capability is the universal extension unit of the Pharos AI Operating
+System.
+
+Examples include:
+
+- Agent Capabilities
+- Tool Capabilities
+- Memory Capabilities
+- Knowledge Capabilities
+- Runtime Capabilities
+- Plugin Capabilities
+
+Capabilities become the common language of the platform.
+
+---
+
+# Capability
+
+A Capability describes **what** can be done.
+
+It never describes **who** performs it.
+
+Examples:
+
+```
+software.architecture.design
+```
+
+```
+flutter.analysis
+```
+
+```
+filesystem.read
+```
+
+```
+knowledge.retrieve
+```
+
+```
+memory.search
+```
+
+```
+calendar.create_event
+```
+
+Capabilities are stable identifiers.
+
+Implementations may change.
+
+---
+
+# Capability Providers
+
+Different components provide capabilities.
+
+Examples:
+
+```
+EngineeringAgent
+
+↓
+
+software.architecture.design
+```
+
+```
+FileTool
+
+↓
+
+filesystem.read
+```
+
+```
+MarkdownKnowledgeProvider
+
+↓
+
+knowledge.retrieve
+```
+
+```
+VectorMemoryProvider
+
+↓
+
+memory.semantic_search
+```
+
+The platform reasons about capabilities rather than concrete classes.
+
+---
+
+# Discovery
+
+Capabilities are registered at startup.
+
+Consumers never instantiate implementations directly.
+
+Instead they request capabilities.
+
+```
+Coordinator
+
+↓
+
+Capability Registry
+
+↓
+
+Capability Provider
+```
+
+The same discovery mechanism applies across the platform.
+
+---
+
+# Runtime
+
+Runtime remains capability-agnostic.
+
+Runtime executes RuntimeIntent.
+
+Runtime never performs capability discovery.
+
+Capability resolution belongs to the Intelligence Layer.
+
+---
+
+# Architectural Principles
+
+## Behaviour over Identity
+
+The system asks:
+
+"What capability is required?"
+
+rather than
+
+"Which class should I instantiate?"
+
+---
+
+## Open for Extension
+
+New functionality is introduced through new capabilities.
+
+Existing orchestration logic remains unchanged.
+
+---
+
+## Replaceable Implementations
+
+A capability may have multiple implementations.
+
+Example:
+
+```
+filesystem.read
+
+↓
+
+Local File Tool
+```
+
+or
+
+```
+filesystem.read
+
+↓
+
+Remote Storage Tool
+```
+
+The consumer remains unchanged.
+
+---
+
+## Unified Extension Model
+
+All extension mechanisms follow one architectural concept.
+
+The platform avoids separate registries for:
+
+- tools
+- agents
+- plugins
+- providers
+
+---
+
+# Dependency Rules
+
+Capability consumers never depend on concrete implementations.
+
+Capability providers never depend on consumers.
+
+Registries expose contracts only.
+
+Runtime never resolves capabilities directly.
+
+---
+
+# Alternatives Considered
+
+## Separate registry per subsystem
+
+Rejected.
+
+Leads to duplicated infrastructure and inconsistent extension models.
+
+---
+
+## Instantiate implementations directly
+
+Rejected.
+
+Violates Dependency Inversion and limits extensibility.
+
+---
+
+## Agent-specific capabilities only
+
+Rejected.
+
+Capabilities should be a platform-wide concept.
+
+---
+
+# Consequences
+
+Positive:
+
+- one extension model
+- consistent architecture
+- easier plugin development
+- scalable discovery
+- reusable infrastructure
+
+Negative:
+
+- additional abstraction
+- requires capability governance
+
+The consistency benefits outweigh the additional abstraction.
+
+---
+
+# Future Evolution
+
+Capabilities may later support:
+
+- versioning
+- priorities
+- permissions
+- dependency graphs
+- semantic matching
+- remote discovery
+- marketplace distribution
+
+The architectural model remains unchanged.
+
+---
+
+# Related ADRs
+
+- ADR-0010 — Tool Execution Model
+- ADR-0011 — Agent Execution Model
+- ADR-0014 — Multi-Agent Orchestration Model
+- ADR-0016 — Capability-Based Agent Architecture

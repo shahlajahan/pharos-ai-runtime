@@ -4,15 +4,21 @@ import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/job.dart';
 import 'package:pharos_ai_runtime/core/logger.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/models/model_provider.dart';
 import 'package:pharos_ai_runtime/runtime/execution_step.dart';
 
 class ExecutionPipeline {
-  const ExecutionPipeline({required Config config, required Logger logger})
-    : _config = config,
-      _logger = logger;
+  const ExecutionPipeline({
+    required Config config,
+    required Logger logger,
+    required ModelProvider modelProvider,
+  }) : _config = config,
+       _logger = logger,
+       _modelProvider = modelProvider;
 
   final Config _config;
   final Logger _logger;
+  final ModelProvider _modelProvider;
 
   Future<Result> run(Agent agent) async {
     final job = Job(
@@ -26,6 +32,7 @@ class ExecutionPipeline {
       startedAt: DateTime.now(),
       environment: _config.environment,
       job: job,
+      modelProvider: _modelProvider,
     );
 
     final step = ExecutionStep(

@@ -50,12 +50,49 @@ void main() {
   );
   const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
 
+  test('complete() POSTs to {baseUrl}/chat/completions, treating baseUrl as '
+      'the API root', () async {
+    final transport = _FakeHttpTransport();
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1',
+    );
+
+    await client.complete(request, modelConfig, openAiConfig);
+
+    expect(
+      transport.capturedUri,
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+    );
+  });
+
+  test(
+    'complete() normalizes a baseUrl with a trailing slash before '
+    'appending /chat/completions (for example an OpenRouter-style URL)',
+    () async {
+      final transport = _FakeHttpTransport();
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://openrouter.ai/api/v1/',
+      );
+
+      await client.complete(request, modelConfig, openAiConfig);
+
+      expect(
+        transport.capturedUri,
+        Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
+      );
+    },
+  );
+
   test('complete() includes the Authorization header', () async {
     final transport = _FakeHttpTransport();
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.complete(request, modelConfig, openAiConfig);
@@ -70,7 +107,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
         organization: 'org-test',
       );
 
@@ -87,7 +124,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
 
       await client.complete(request, modelConfig, openAiConfig);
@@ -104,7 +141,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.complete(request, modelConfig, openAiConfig);
@@ -118,7 +155,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.complete(request, modelConfig, openAiConfig);
@@ -132,7 +169,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.complete(request, modelConfig, openAiConfig);
@@ -150,7 +187,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.complete(request, modelConfig, openAiConfig);
@@ -172,7 +209,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
 
       final result = await client.complete(request, modelConfig, openAiConfig);
@@ -186,7 +223,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -202,7 +239,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -225,7 +262,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -249,7 +286,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -276,7 +313,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -300,7 +337,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -315,7 +352,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
 
       final result = await client.complete(request, modelConfig, openAiConfig);
@@ -334,7 +371,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -359,7 +396,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -384,7 +421,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -410,7 +447,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -437,7 +474,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -460,7 +497,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     expect(
@@ -476,7 +513,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.complete(request, modelConfig, openAiConfig);
@@ -490,7 +527,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithTools = ModelRequest(
       conversation: Conversation(
@@ -520,7 +557,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
       const requestWithTools = ModelRequest(
         conversation: Conversation(
@@ -558,7 +595,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithTools = ModelRequest(
       conversation: Conversation(
@@ -593,7 +630,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -610,7 +647,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -628,7 +665,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -653,7 +690,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
 
       final result = await client.complete(request, modelConfig, openAiConfig);
@@ -677,7 +714,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
 
       final result = await client.complete(request, modelConfig, openAiConfig);
@@ -697,7 +734,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -714,7 +751,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -731,7 +768,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -749,7 +786,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final result = await client.complete(request, modelConfig, openAiConfig);
@@ -764,7 +801,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.complete(request, modelConfig, openAiConfig);
@@ -783,7 +820,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithToolOutputs = ModelRequest(
       conversation: Conversation(
@@ -821,7 +858,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithToolOutputs = ModelRequest(
       conversation: Conversation(
@@ -860,7 +897,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithDuplicate = ModelRequest(
       conversation: Conversation(
@@ -907,7 +944,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithBoth = ModelRequest(
       conversation: Conversation(
@@ -954,7 +991,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithSystemOnly = ModelRequest(
       conversation: Conversation(
@@ -977,7 +1014,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithUserOnly = ModelRequest(
       conversation: Conversation(
@@ -1002,7 +1039,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
       const requestWithAssistant = ModelRequest(
         conversation: Conversation(
@@ -1031,7 +1068,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
       const requestWithAssistant = ModelRequest(
         conversation: Conversation(
@@ -1077,7 +1114,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
     const requestWithToolMessage = ModelRequest(
       conversation: Conversation(
@@ -1112,7 +1149,7 @@ void main() {
       final client = HttpOpenAIClient(transport: transport);
       const openAiConfig = OpenAIConfig(
         apiKey: 'sk-test',
-        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        baseUrl: 'https://api.openai.com/v1',
       );
       const requestWithMixedConversation = ModelRequest(
         conversation: Conversation(
@@ -1156,12 +1193,49 @@ void main() {
     },
   );
 
+  test('stream() POSTs to {baseUrl}/chat/completions, treating baseUrl as '
+      'the API root', () async {
+    final transport = _FakeHttpTransport()..responseBody = 'data: [DONE]\n\n';
+    final client = HttpOpenAIClient(transport: transport);
+    const openAiConfig = OpenAIConfig(
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1',
+    );
+
+    await client.stream(request, modelConfig, openAiConfig);
+
+    expect(
+      transport.capturedUri,
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+    );
+  });
+
+  test(
+    'stream() normalizes a baseUrl with a trailing slash before '
+    'appending /chat/completions (for example an OpenRouter-style URL)',
+    () async {
+      final transport = _FakeHttpTransport()..responseBody = 'data: [DONE]\n\n';
+      final client = HttpOpenAIClient(transport: transport);
+      const openAiConfig = OpenAIConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://openrouter.ai/api/v1/',
+      );
+
+      await client.stream(request, modelConfig, openAiConfig);
+
+      expect(
+        transport.capturedUri,
+        Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
+      );
+    },
+  );
+
   test('stream() sends "stream": true in the request body', () async {
     final transport = _FakeHttpTransport()..responseBody = 'data: [DONE]\n\n';
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.stream(request, modelConfig, openAiConfig);
@@ -1175,7 +1249,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final streamingResponse = await client.stream(
@@ -1196,7 +1270,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final streamingResponse = await client.stream(
@@ -1220,7 +1294,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final streamingResponse = await client.stream(
@@ -1247,7 +1321,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final streamingResponse = await client.stream(
@@ -1273,7 +1347,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final streamingResponse = await client.stream(
@@ -1298,7 +1372,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     final streamingResponse = await client.stream(
@@ -1318,7 +1392,7 @@ void main() {
     final client = HttpOpenAIClient(transport: transport);
     const openAiConfig = OpenAIConfig(
       apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      baseUrl: 'https://api.openai.com/v1',
     );
 
     await client.complete(request, modelConfig, openAiConfig);

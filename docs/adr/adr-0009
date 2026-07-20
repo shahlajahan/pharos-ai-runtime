@@ -1,0 +1,290 @@
+# ADR-0009 — Workflow Execution Model
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+The Runtime separates planning from execution.
+
+After a RuntimeIntent is analyzed by the RuntimePlanner, the result is
+represented as a RuntimePlan.
+
+A design decision was required:
+
+Should RuntimePlan execute itself?
+
+Or should execution be delegated to another abstraction?
+
+The second approach was selected.
+
+---
+
+# Decision
+
+RuntimePlan is a pure data structure.
+
+Execution is delegated to Workflow.
+
+Workflow instances are constructed by WorkflowBuilder.
+
+```
+RuntimeIntent
+        │
+        ▼
+RuntimePlanner
+        │
+        ▼
+RuntimePlan
+        │
+        ▼
+WorkflowBuilder
+        │
+        ▼
+Workflow
+        │
+        ▼
+WorkflowResult
+```
+
+Planning and execution are independent responsibilities.
+
+---
+
+# Why RuntimePlan Is Not Executable
+
+A RuntimePlan answers:
+
+> What should happen?
+
+It never answers:
+
+> How should it happen?
+
+Examples of RuntimePlan data:
+
+- goals
+- ordered steps
+- dependencies
+- constraints
+- metadata
+
+A RuntimePlan contains no execution logic.
+
+---
+
+# Why Workflow Exists
+
+Workflow represents executable behaviour.
+
+It owns:
+
+- execution order
+- execution lifecycle
+- step progression
+- future cancellation
+- future retries
+- future parallel execution
+- future monitoring
+
+Workflow is behaviour.
+
+RuntimePlan is data.
+
+---
+
+# WorkflowBuilder
+
+WorkflowBuilder converts a RuntimePlan into an executable Workflow.
+
+It owns no planning logic.
+
+It owns no execution.
+
+It only assembles execution.
+
+Different builders may produce different workflows for the same plan.
+
+Examples:
+
+```
+RuntimePlan
+
+↓
+
+SequentialWorkflow
+```
+
+```
+RuntimePlan
+
+↓
+
+ParallelWorkflow
+```
+
+```
+RuntimePlan
+
+↓
+
+DistributedWorkflow
+```
+
+The planner remains unchanged.
+
+---
+
+# Current Implementation
+
+Current Runtime uses:
+
+```
+DefaultWorkflowBuilder
+
+↓
+
+MinimalWorkflow
+```
+
+MinimalWorkflow exists only to provide a deterministic Runtime bootstrap.
+
+It performs no orchestration.
+
+It simply returns a WorkflowResult.
+
+Future implementations will replace it without changing RuntimeEngine.
+
+---
+
+# Dependency Rules
+
+Workflow depends on:
+
+- RuntimePlan (through construction)
+
+Workflow never depends on:
+
+- RuntimePlanner
+- RuntimeIntent
+- Company
+- Products
+
+WorkflowBuilder depends only on:
+
+- RuntimePlan
+- Workflow contracts
+
+---
+
+# Architectural Principles
+
+## Data vs Behaviour
+
+RuntimePlan stores information.
+
+Workflow performs work.
+
+The two concepts must never be merged.
+
+---
+
+## Replaceable Execution
+
+Execution models may evolve independently.
+
+Possible future workflows:
+
+- SequentialWorkflow
+- ParallelWorkflow
+- ConditionalWorkflow
+- RetryWorkflow
+- StreamingWorkflow
+- MultiAgentWorkflow
+
+No planner changes are required.
+
+---
+
+## Stable Planning Layer
+
+Planning is isolated from execution.
+
+Improving execution never changes planners.
+
+Improving planners never changes execution.
+
+---
+
+# Alternatives Considered
+
+## RuntimePlan executes itself
+
+Rejected.
+
+Data objects should not own execution behaviour.
+
+---
+
+## RuntimePlanner executes directly
+
+Rejected.
+
+Planning and execution have different responsibilities.
+
+---
+
+## RuntimeEngine executes RuntimePlan
+
+Rejected.
+
+RuntimeEngine coordinates.
+
+Workflow executes.
+
+---
+
+# Consequences
+
+Positive:
+
+- strict separation of concerns
+- replaceable execution models
+- simpler planners
+- cleaner testing
+- future orchestration support
+
+Negative:
+
+- one additional abstraction
+- slightly more architectural complexity
+
+The benefits outweigh the additional abstraction.
+
+---
+
+# Future Evolution
+
+Future Workflow implementations may support:
+
+- retries
+- cancellation
+- pause / resume
+- checkpointing
+- streaming
+- metrics
+- distributed execution
+- multi-agent execution
+
+The Runtime Core remains unchanged.
+
+---
+
+# Related ADRs
+
+- ADR-0003 — Execution Strategy
+- ADR-0006 — Runtime Planning Pipeline
+- ADR-0008 — Runtime Core Architecture

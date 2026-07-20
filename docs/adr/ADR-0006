@@ -1,0 +1,125 @@
+ADR-0006 — Runtime Planning Pipeline
+Status: Accepted
+Date: 2026-07-19
+Context
+The Runtime must transform business intentions into executable workflows while remaining completely independent of the Company domain.
+Historically, planning, workflow construction and execution tend to become tightly coupled. This makes systems difficult to evolve and nearly impossible to replace individual components.
+Pharos adopts a layered planning pipeline where each stage has exactly one responsibility.
+Decision
+The Runtime planning pipeline is defined as:
+CompanyIntent
+        │
+        ▼
+(ACL Adapter)
+        │
+        ▼
+RuntimeIntent
+        │
+        ▼
+PlanningRequest
+        │
+        ▼
+RuntimePlanner
+        │
+        ▼
+PlanningResult
+        │
+        ▼
+RuntimePlan
+        │
+        ▼
+WorkflowBuilder
+        │
+        ▼
+Workflow
+        │
+        ▼
+ExecutionStrategy
+        │
+        ▼
+Runtime
+Responsibilities
+CompanyIntent
+Represents a business objective.
+Examples:
+Release version 2.0
+Audit localization
+Analyze repository
+Generate documentation
+It belongs exclusively to Company.
+RuntimeIntent
+Represents the Runtime's understanding of that objective.
+Runtime does not know anything about Company.
+PlanningRequest
+Container passed into the planner.
+It carries the RuntimeIntent.
+Nothing more.
+RuntimePlanner
+Responsible for deciding what plan should be produced.
+It does not execute anything.
+It does not create workflows.
+It does not call tools.
+PlanningResult
+Represents the output of planning.
+Today it contains:
+RuntimePlan
+It may later include metadata, diagnostics, confidence, or reasoning.
+RuntimePlan
+Represents the high-level execution blueprint.
+A RuntimePlan describes what must happen.
+It does not describe how execution occurs.
+WorkflowBuilder
+Transforms a RuntimePlan into a Workflow.
+Responsible only for workflow construction.
+Workflow
+Represents executable steps.
+No planning logic exists here.
+ExecutionStrategy
+Responsible for execution order.
+Examples:
+Sequential
+Parallel
+Conditional
+Retry
+Human approval
+Runtime
+Executes workflows.
+Nothing more.
+Architectural Principles
+Every layer owns exactly one responsibility.
+Information flows downward.
+Execution never flows upward.
+Planning never depends on execution.
+Execution never depends on Company.
+Dependency Rules
+Company must never import Runtime.
+Runtime must never import Company.
+Workflow must never know Planning.
+Planning must never know Workflow internals.
+Execution must never modify Plans.
+Benefits
+The pipeline allows:
+alternative planners
+multiple workflow builders
+multiple execution engines
+deterministic testing
+AI-assisted planning
+future distributed execution
+without changing the surrounding layers.
+Consequences
+Adding a new planner requires no Runtime changes.
+Replacing execution strategies requires no planning changes.
+Company can evolve independently.
+Runtime can be embedded into different products.
+Current Implementation Status
+Stage	Status
+CompanyIntent	✅
+RuntimeIntent	✅
+PlanningRequest	✅
+RuntimePlanner	✅
+PlanningResult	✅
+RuntimePlan	✅
+WorkflowBuilder	⏳
+Workflow	✅ (foundation exists)
+ExecutionStrategy	✅ (foundation exists)
+Runtime Engine	⏳

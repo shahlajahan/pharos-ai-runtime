@@ -1,0 +1,244 @@
+# ADR-0016 — Capability-Based Agent Architecture
+
+- Status: Accepted
+- Date: 2026-07-19
+- Deciders: Pharos Architecture Team
+
+---
+
+# Context
+
+As the number of Agents increases, selecting the correct Agent for a
+request becomes increasingly difficult.
+
+A naïve implementation often relies on hardcoded routing rules such as:
+
+- if request contains "code" → EngineeringAgent
+- if request contains "marketing" → MarketingAgent
+
+This approach does not scale.
+
+Adding a new Agent requires modifying routing logic, violating the
+Open/Closed Principle.
+
+The system requires a more flexible model.
+
+---
+
+# Decision
+
+Agents shall advertise capabilities rather than identities.
+
+The Coordinator selects Agents based on declared capabilities.
+
+```
+                Coordinator
+                     │
+                     ▼
+          Capability Registry
+                     │
+     ┌───────────────┴───────────────┐
+     ▼                               ▼
+EngineeringAgent             MarketingAgent
+Capabilities                 Capabilities
+```
+
+Routing decisions are capability-driven rather than name-driven.
+
+---
+
+# Capability
+
+A Capability represents something an Agent can do.
+
+Examples:
+
+- software.architecture
+- flutter.analysis
+- code.review
+- release.management
+- marketing.copywriting
+- seo.optimization
+- legal.review
+- finance.analysis
+
+Capabilities are immutable identifiers.
+
+---
+
+# Agent Identity
+
+Agent identity is informational.
+
+Capabilities determine behaviour.
+
+For example:
+
+```
+EngineeringAgent
+
+Capabilities:
+
+- code.review
+- flutter.analysis
+- architecture.design
+```
+
+The Coordinator never routes based on the Agent name.
+
+---
+
+# Coordinator Responsibilities
+
+The Coordinator:
+
+- receives user objectives
+- determines required capabilities
+- discovers matching Agents
+- delegates work
+- aggregates results
+
+The Coordinator never performs domain work itself.
+
+---
+
+# Capability Registry
+
+Capability discovery is delegated to a registry.
+
+Responsibilities:
+
+- capability lookup
+- capability indexing
+- agent discovery
+- capability validation
+
+Adding a new Agent requires only registration.
+
+No Coordinator changes are required.
+
+---
+
+# Dependency Rules
+
+Coordinator depends on Capability Registry.
+
+Capability Registry depends on Agent contracts.
+
+Agents never depend on Coordinator implementations.
+
+Runtime remains unaware of capabilities.
+
+---
+
+# Architectural Principles
+
+## Open for Extension
+
+New Agents are added through registration.
+
+Existing routing logic remains unchanged.
+
+---
+
+## Domain Independence
+
+Capabilities describe behaviour rather than departments.
+
+For example:
+
+```
+flutter.analysis
+```
+
+instead of
+
+```
+engineering
+```
+
+This enables multiple Agents to share capabilities.
+
+---
+
+## Multiple Capabilities
+
+One Agent may expose multiple capabilities.
+
+One Capability may be implemented by multiple Agents.
+
+Selection policies are outside the Runtime.
+
+---
+
+# Alternatives Considered
+
+## Route by Agent name
+
+Rejected.
+
+Tight coupling.
+
+Poor scalability.
+
+---
+
+## Route by department
+
+Rejected.
+
+Departments change.
+
+Capabilities remain stable.
+
+---
+
+## Runtime selects Agents
+
+Rejected.
+
+Runtime executes work.
+
+Coordination belongs to the Intelligence Layer.
+
+---
+
+# Consequences
+
+Positive:
+
+- scalable routing
+- extensible Agent ecosystem
+- decoupled Coordinator
+- easier testing
+- plugin-friendly architecture
+
+Negative:
+
+- additional registry component
+- capability taxonomy must be maintained
+
+These trade-offs are acceptable.
+
+---
+
+# Future Evolution
+
+Future versions may support:
+
+- capability ranking
+- capability negotiation
+- confidence scores
+- multiple candidate Agents
+- dynamic capability loading
+- marketplace-distributed Agents
+
+The Runtime Core remains unchanged.
+
+---
+
+# Related ADRs
+
+- ADR-0011 — Agent Execution Model
+- ADR-0014 — Multi-Agent Orchestration Model
+- ADR-0015 — Company Brain Architecture

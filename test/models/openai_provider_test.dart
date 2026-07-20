@@ -43,7 +43,7 @@ void main() {
   const modelConfig = ModelConfig(model: 'gpt-4', temperature: 0.7);
   const openAiConfig = OpenAIConfig(
     apiKey: 'sk-test',
-    baseUrl: 'https://api.openai.com/v1/chat/completions',
+    baseUrl: 'https://api.openai.com/v1',
   );
 
   test('generate() forwards the request unchanged', () async {
