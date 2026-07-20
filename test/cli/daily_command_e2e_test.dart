@@ -22,7 +22,11 @@ void main() {
       );
 
       expect(result.exitCode, 0, reason: result.stderr.toString());
-      expect(result.stdout as String, contains('PHAROS DAILY REPORT'));
+      final stdout = result.stdout as String;
+      expect(stdout, contains('PHAROS TODAY'));
+      expect(stdout, contains('Blocked Items'));
+      expect(stdout, contains('Missing Data'));
+      expect(stdout, contains('Recommended Next Connections'));
     } finally {
       if (workspace.existsSync()) {
         workspace.deleteSync(recursive: true);
@@ -39,6 +43,6 @@ void main() {
     ]);
 
     expect(result.exitCode, 0, reason: result.stderr.toString());
-    expect(result.stdout as String, contains('PHAROS DAILY REPORT'));
+    expect(result.stdout as String, contains('PHAROS TODAY'));
   }, timeout: const Timeout(Duration(seconds: 60)));
 }

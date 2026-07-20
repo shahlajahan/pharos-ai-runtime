@@ -12,7 +12,9 @@ import 'package:test/test.dart';
 
 class _SpyModelProvider extends ModelProvider {
   ModelRequest? capturedRequest;
-  ModelResponse response = const ModelResponse(text: 'Executive report body.');
+  ModelResponse response = const ModelResponse(
+    text: "Today's Marketing Priorities\nPublish content.",
+  );
 
   @override
   Future<ModelResponse> generate(ModelRequest request) async {
@@ -62,7 +64,8 @@ void main() {
     expect(agent.id, 'daily');
   });
 
-  test('run() sends exactly one request to the ModelProvider', () async {
+  test('run() sends exactly one request to the ModelProvider for the whole '
+      'Company Plan', () async {
     final modelProvider = _SpyModelProvider();
     final agent = DailyAgent(workspaceRoot: workspace.path);
 
@@ -71,10 +74,8 @@ void main() {
     expect(modelProvider.capturedRequest, isNotNull);
   });
 
-  test('run() uses CompanySnapshot rather than CompanyContext directly: the '
-      'sent prompt is shaped like a DailyPromptBuilder prompt (Company '
-      'Snapshot, Known Data, Missing Data, Risks), not a raw Company '
-      'Context dump', () async {
+  test('run() sends a prompt grounded per department, not a generic company '
+      'summary', () async {
     final companyDir = Directory('${workspace.path}/company')..createSync();
     File(
       '${companyDir.path}/overview.md',
@@ -90,18 +91,18 @@ void main() {
         .single
         .content;
 
-    expect(prompt, contains('Company Snapshot:'));
-    expect(prompt, contains('Known Data:'));
-    expect(prompt, contains('Missing Data:'));
-    expect(prompt, contains('Risks:'));
-    expect(prompt, contains('Recommendations Input:'));
+    expect(prompt, contains('Executive Snapshot:'));
+    expect(prompt, contains('Engineering Snapshot:'));
+    expect(prompt, contains('Marketing Snapshot:'));
+    expect(prompt, contains('Sales Snapshot:'));
+    expect(prompt, contains('Operations Snapshot:'));
+    expect(prompt, contains('Finance Snapshot:'));
+    expect(prompt, contains("Today's Executive Priorities"));
+    expect(prompt, contains("Today's Finance Priorities"));
     expect(prompt, contains('We build developer tools.'));
-    // The old CompanyContext-style prompt never mentioned a workflow
-    // goal or distinguished Known/Unknown/Recommendation.
-    expect(prompt, contains('Workflow goal:'));
   });
 
-  test('run() prompt contains the hallucination prevention rules', () async {
+  test('run() prompt contains hallucination-prevention rules', () async {
     final modelProvider = _SpyModelProvider();
     final agent = DailyAgent(workspaceRoot: workspace.path);
 
@@ -115,16 +116,11 @@ void main() {
     expect(prompt, contains('Never invent company facts'));
     expect(prompt, contains('Never invent KPIs'));
     expect(prompt, contains('Never invent campaigns'));
-    expect(prompt, contains('Never invent analytics'));
-    expect(prompt, contains('Never invent revenue'));
-    expect(prompt, contains('unavailable'));
-    expect(prompt, contains('Known'));
-    expect(prompt, contains('Unknown'));
-    expect(prompt, contains('Recommendation'));
   });
 
-  test('run() prints PHAROS DAILY REPORT, the generated Executive Report, '
-      'and a Data Sources Used section', () async {
+  test('run() prints PHAROS TODAY, the generated Company Plan, and '
+      'Runtime-rendered Blocked Items, Missing Data, and Recommended Next '
+      'Connections sections', () async {
     final companyDir = Directory('${workspace.path}/company')..createSync();
     File(
       '${companyDir.path}/overview.md',
@@ -132,7 +128,7 @@ void main() {
 
     final modelProvider = _SpyModelProvider()
       ..response = const ModelResponse(
-        text: 'Executive Summary\nEverything looks stable.',
+        text: "Today's Executive Priorities\nStabilize the roadmap.",
       );
     final agent = DailyAgent(workspaceRoot: workspace.path);
 
@@ -141,11 +137,11 @@ void main() {
     );
     final report = output.join('\n');
 
-    expect(report, contains('PHAROS DAILY REPORT'));
-    expect(report, contains('Everything looks stable.'));
-    expect(report, contains('Data Sources Used'));
-    expect(report, contains('✓ Company'));
-    expect(report, contains('✗ CRM'));
+    expect(report, contains('PHAROS TODAY'));
+    expect(report, contains('Stabilize the roadmap.'));
+    expect(report, contains('Blocked Items'));
+    expect(report, contains('Missing Data'));
+    expect(report, contains('Recommended Next Connections'));
   });
 
   test('run() returns a success Result', () async {
