@@ -89,6 +89,7 @@ void main(List<String> arguments) async {
   if (agentArgs.isEmpty) {
     logger.info('Usage:');
     logger.info('pharos marketing');
+    logger.info('pharos daily');
     return;
   }
 
