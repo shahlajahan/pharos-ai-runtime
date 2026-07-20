@@ -131,4 +131,105 @@ void main() {
     expect(first.knownTypes, second.knownTypes);
     expect(first.missingTypes, second.missingTypes);
   });
+
+  test('Marketing receives Website, Domain, BrandAsset, SocialAccount, and '
+      'MediaAsset facts when present', () {
+    const builder = DepartmentFactBuilder();
+    final graph = KnowledgeGraph(
+      facts: [
+        _fact(FactType.website, 'petsupo.com', {
+          Department.executive,
+          Department.marketing,
+        }),
+        _fact(FactType.domain, 'petsupo.com', {
+          Department.executive,
+          Department.marketing,
+        }),
+        _fact(FactType.brandAsset, 'Brand Kit', {
+          Department.executive,
+          Department.marketing,
+        }),
+        _fact(FactType.socialAccount, 'Instagram', {
+          Department.executive,
+          Department.marketing,
+        }),
+        _fact(FactType.mediaAsset, 'Hero Video', {
+          Department.executive,
+          Department.marketing,
+        }),
+      ],
+    );
+
+    final marketing = builder.build(Department.marketing, graph);
+
+    expect(
+      marketing.knownTypes,
+      containsAll([
+        FactType.website,
+        FactType.domain,
+        FactType.brandAsset,
+        FactType.socialAccount,
+        FactType.mediaAsset,
+      ]),
+    );
+    expect(marketing.facts, hasLength(5));
+  });
+
+  test('Account facts are visible to both Finance and Sales, but a Finance '
+      'account never leaks into Sales and vice versa', () {
+    const builder = DepartmentFactBuilder();
+    final graph = KnowledgeGraph(
+      facts: [
+        _fact(FactType.account, 'OpenAI', {
+          Department.executive,
+          Department.finance,
+        }),
+        _fact(FactType.account, 'Petsupo Partner CRM', {
+          Department.executive,
+          Department.sales,
+        }),
+      ],
+    );
+
+    final finance = builder.build(Department.finance, graph);
+    final sales = builder.build(Department.sales, graph);
+
+    expect(finance.facts.map((f) => f.name), ['OpenAI']);
+    expect(sales.facts.map((f) => f.name), ['Petsupo Partner CRM']);
+  });
+
+  test('Marketing receives AdvertisingPlatform facts when present', () {
+    const builder = DepartmentFactBuilder();
+    final graph = KnowledgeGraph(
+      facts: [
+        _fact(FactType.advertisingPlatform, 'Google Ads', {
+          Department.executive,
+          Department.marketing,
+        }),
+      ],
+    );
+
+    final marketing = builder.build(Department.marketing, graph);
+
+    expect(marketing.knownTypes, contains(FactType.advertisingPlatform));
+  });
+
+  test('Operations and Engineering both receive Infrastructure facts', () {
+    const builder = DepartmentFactBuilder();
+    final graph = KnowledgeGraph(
+      facts: [
+        _fact(FactType.infrastructure, 'Cloud Hosting', {
+          Department.executive,
+          Department.engineering,
+          Department.operations,
+        }),
+      ],
+    );
+
+    final operations = builder.build(Department.operations, graph);
+    final engineering = builder.build(Department.engineering, graph);
+
+    expect(operations.knownTypes, contains(FactType.infrastructure));
+    expect(engineering.knownTypes, contains(FactType.infrastructure));
+  });
 }

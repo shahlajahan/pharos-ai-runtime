@@ -21,7 +21,10 @@ enum FactType {
   subscription('Subscription'),
   paymentProvider('Payment Provider'),
   workflow('Workflow'),
-  policy('Policy');
+  policy('Policy'),
+  seoAsset('SEO Asset'),
+  advertisingPlatform('Advertising Platform'),
+  account('Account');
 
   const FactType(this.displayName);
 

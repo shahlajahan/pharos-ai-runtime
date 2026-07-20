@@ -60,15 +60,37 @@ NLP, never an LLM call, never a summary, never an inference:
   keyword approach used previously for department context extraction).
 - `products` -> `Product`, visible to Executive, Marketing, Engineering,
   Sales.
-- `assets` -> `BrandAsset` if the document name contains "brand",
-  otherwise `MediaAsset`; visible to Executive and Marketing.
 - `services` -> `Service`, visible to Executive and Engineering.
 - `websites` -> `Website` (plus a `Domain` fact too, if the document
   name looks like a domain), visible to Executive and Marketing.
 - `social` -> `SocialAccount`, visible to Executive and Marketing.
 - `analytics` -> `AnalyticsPlatform`, visible to Executive and Marketing.
-- Any other category produces no fact — "if a fact cannot be extracted
-  confidently, ignore it" applies to unrecognized categories too.
+- `assets` -> real HQ content lives in subfolders below `assets/`, not
+  flat, so `FactExtractor` dispatches on the first path segment below
+  `assets/` (via `CompanyDocument.path`, which the loader now preserves
+  alongside the existing basename-only `name`):
+  - `assets/websites` -> `Website` (+ `Domain` if the name looks like one)
+  - `assets/domains` -> `Domain`
+  - `assets/social` -> `SocialAccount`
+  - `assets/analytics` -> `AnalyticsPlatform`
+  - `assets/services` -> `Service`
+  - `assets/brand` -> `BrandAsset`
+  - `assets/media` -> `MediaAsset`
+  - `assets/seo` -> `SEOAsset`
+  - `assets/ads` -> `AdvertisingPlatform`
+  - `assets/accounts` -> `Account`, visible to Executive and Finance
+  - `assets/infrastructure` -> `Infrastructure`, visible to Executive,
+    Engineering, and Operations
+  - `assets/crm` -> `Account`, visible to Executive and Sales
+  - `assets/finance` -> split by document name: `PaymentProvider` if it
+    contains "payment", `Account` if it contains "account", otherwise
+    `Subscription`
+  - Any other subfolder, or a file directly under `assets/` with no
+    subfolder, falls back to the original rule: `BrandAsset` if the name
+    contains "brand", otherwise `MediaAsset`.
+- Any other top-level category produces no fact — "if a fact cannot be
+  extracted confidently, ignore it" applies to unrecognized categories
+  too.
 
 ### `KnowledgeGraph`
 
@@ -160,11 +182,10 @@ inference the LLM must never perform.
 - `CompanyFact.attributes` stays empty for every fact today; populating
   real structured fields (market, status, platforms, ...) would require
   inference this task explicitly forbids.
-- Several built-in `FactType`s (`Repository`, `Infrastructure`,
-  `Competitor`, `TargetMarket`, `Technology`, `Subscription`,
-  `PaymentProvider`, `Workflow`, `Policy`) have no HQ category to extract
-  from yet, so `FactExtractor` never produces them today — they exist so
-  future connectors can inject facts into the same graph.
+- Several built-in `FactType`s (`Repository`, `Competitor`,
+  `TargetMarket`, `Technology`, `Workflow`, `Policy`) still have no HQ
+  folder to extract from, so `FactExtractor` never produces them today —
+  they exist so future connectors can inject facts into the same graph.
 - Whether an LLM-authored recommendation actually cites real evidence is
   enforced through the prompt's Reasoning Goal, not verified
   deterministically afterward — matching how prior tasks handled

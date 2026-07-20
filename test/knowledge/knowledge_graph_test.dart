@@ -116,6 +116,76 @@ void main() {
     expect(graph.factsByType(FactType.product), hasLength(2));
   });
 
+  test('services() returns only Service facts', () {
+    final graph = KnowledgeGraph(facts: [_fact(FactType.service, 'Firebase')]);
+
+    expect(graph.services().map((f) => f.name), ['Firebase']);
+  });
+
+  test('domains() returns only Domain facts', () {
+    final graph = KnowledgeGraph(
+      facts: [_fact(FactType.domain, 'petsupo.com')],
+    );
+
+    expect(graph.domains().map((f) => f.name), ['petsupo.com']);
+  });
+
+  test('brandAssets() returns only BrandAsset facts', () {
+    final graph = KnowledgeGraph(
+      facts: [_fact(FactType.brandAsset, 'Brand Kit')],
+    );
+
+    expect(graph.brandAssets().map((f) => f.name), ['Brand Kit']);
+  });
+
+  test('mediaAssets() returns only MediaAsset facts', () {
+    final graph = KnowledgeGraph(
+      facts: [_fact(FactType.mediaAsset, 'Hero Video')],
+    );
+
+    expect(graph.mediaAssets().map((f) => f.name), ['Hero Video']);
+  });
+
+  test('seoAssets() returns only SEOAsset facts', () {
+    final graph = KnowledgeGraph(
+      facts: [_fact(FactType.seoAsset, 'Keyword Strategy')],
+    );
+
+    expect(graph.seoAssets().map((f) => f.name), ['Keyword Strategy']);
+  });
+
+  test('analyticsPlatforms() returns only AnalyticsPlatform facts', () {
+    final graph = KnowledgeGraph(
+      facts: [_fact(FactType.analyticsPlatform, 'GA4')],
+    );
+
+    expect(graph.analyticsPlatforms().map((f) => f.name), ['GA4']);
+  });
+
+  test('repositories() returns only Repository facts', () {
+    final graph = KnowledgeGraph(
+      facts: [_fact(FactType.repository, 'pharos-runtime')],
+    );
+
+    expect(graph.repositories().map((f) => f.name), ['pharos-runtime']);
+  });
+
+  test('paymentProviders() returns only PaymentProvider facts', () {
+    final graph = KnowledgeGraph(
+      facts: [_fact(FactType.paymentProvider, 'Stripe')],
+    );
+
+    expect(graph.paymentProviders().map((f) => f.name), ['Stripe']);
+  });
+
+  test('subscriptions() returns only Subscription facts', () {
+    final graph = KnowledgeGraph(
+      facts: [_fact(FactType.subscription, 'OpenAI')],
+    );
+
+    expect(graph.subscriptions().map((f) => f.name), ['OpenAI']);
+  });
+
   test('factsByDepartment() returns only facts visible to that department', () {
     final graph = KnowledgeGraph(
       facts: [

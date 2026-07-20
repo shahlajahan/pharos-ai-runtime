@@ -21,6 +21,8 @@ class DepartmentFactBuilder {
       FactType.domain,
       FactType.brandAsset,
       FactType.mediaAsset,
+      FactType.seoAsset,
+      FactType.advertisingPlatform,
       FactType.socialAccount,
       FactType.analyticsPlatform,
       FactType.repository,
@@ -32,6 +34,7 @@ class DepartmentFactBuilder {
       FactType.paymentProvider,
       FactType.workflow,
       FactType.policy,
+      FactType.account,
     },
     Department.marketing: {
       FactType.capability,
@@ -40,6 +43,8 @@ class DepartmentFactBuilder {
       FactType.domain,
       FactType.brandAsset,
       FactType.mediaAsset,
+      FactType.seoAsset,
+      FactType.advertisingPlatform,
       FactType.socialAccount,
       FactType.analyticsPlatform,
       FactType.competitor,
@@ -59,17 +64,20 @@ class DepartmentFactBuilder {
       FactType.product,
       FactType.competitor,
       FactType.targetMarket,
+      FactType.account,
     },
     Department.finance: {
       FactType.capability,
       FactType.subscription,
       FactType.paymentProvider,
       FactType.policy,
+      FactType.account,
     },
     Department.operations: {
       FactType.capability,
       FactType.workflow,
       FactType.policy,
+      FactType.infrastructure,
     },
   };
 

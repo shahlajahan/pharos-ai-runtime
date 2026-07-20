@@ -157,4 +157,271 @@ void main() {
     expect(first.single.id, second.single.id);
     expect(first.single.visibleTo, second.single.visibleTo);
   });
+
+  test('extract() classifies assets/websites documents as Website (plus '
+      'Domain when the name looks like one), visible to Executive and '
+      'Marketing', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'petsupo-com',
+      path: 'websites/petsupo-com',
+      content: 'Marketing website.',
+    );
+
+    final facts = extractor.extract([document]);
+
+    expect(facts, hasLength(1));
+    expect(facts.single.type, FactType.website);
+    expect(facts.single.visibleTo, {
+      Department.executive,
+      Department.marketing,
+    });
+  });
+
+  test('extract() classifies assets/domains documents as Domain, visible to '
+      'Executive and Marketing', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'petsupo-com',
+      path: 'domains/petsupo-com',
+      content: 'Primary domain.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.domain);
+    expect(fact.visibleTo, {Department.executive, Department.marketing});
+  });
+
+  test('extract() classifies assets/brand documents as BrandAsset, visible '
+      'to Executive and Marketing', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'logo-usage',
+      path: 'brand/logo-usage',
+      content: 'Brand usage guidelines.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.brandAsset);
+    expect(fact.visibleTo, {Department.executive, Department.marketing});
+  });
+
+  test('extract() classifies assets/media documents as MediaAsset, visible '
+      'to Executive and Marketing', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'hero-video',
+      path: 'media/hero-video',
+      content: 'Hero video.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.mediaAsset);
+    expect(fact.visibleTo, {Department.executive, Department.marketing});
+  });
+
+  test('extract() classifies assets/seo documents as SEOAsset, visible to '
+      'Executive and Marketing', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'keyword-strategy',
+      path: 'seo/keyword-strategy',
+      content: 'SEO keyword strategy.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.seoAsset);
+    expect(fact.visibleTo, {Department.executive, Department.marketing});
+  });
+
+  test('extract() classifies assets/ads documents as AdvertisingPlatform, '
+      'visible to Executive and Marketing', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'google-ads',
+      path: 'ads/google-ads',
+      content: 'Google Ads account.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.advertisingPlatform);
+    expect(fact.visibleTo, {Department.executive, Department.marketing});
+  });
+
+  test('extract() classifies assets/social documents as SocialAccount, '
+      'visible to Executive and Marketing', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'instagram',
+      path: 'social/instagram',
+      content: 'Instagram account.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.socialAccount);
+    expect(fact.visibleTo, {Department.executive, Department.marketing});
+  });
+
+  test('extract() classifies assets/analytics documents as '
+      'AnalyticsPlatform, visible to Executive and Marketing', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'ga4',
+      path: 'analytics/ga4',
+      content: 'Google Analytics 4.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.analyticsPlatform);
+    expect(fact.visibleTo, {Department.executive, Department.marketing});
+  });
+
+  test('extract() classifies assets/services documents as Service, visible '
+      'to Executive and Engineering', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'firebase',
+      path: 'services/firebase',
+      content: 'Backend hosting service.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.service);
+    expect(fact.visibleTo, {Department.executive, Department.engineering});
+  });
+
+  test('extract() classifies assets/infrastructure documents as '
+      'Infrastructure, visible to Executive, Engineering, and Operations', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'hosting',
+      path: 'infrastructure/hosting',
+      content: 'Cloud hosting setup.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.infrastructure);
+    expect(fact.visibleTo, {
+      Department.executive,
+      Department.engineering,
+      Department.operations,
+    });
+  });
+
+  test('extract() classifies assets/accounts documents as Account, visible '
+      'to Executive and Finance', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'openai',
+      path: 'accounts/openai',
+      content: 'OpenAI account.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.account);
+    expect(fact.visibleTo, {Department.executive, Department.finance});
+  });
+
+  test('extract() classifies assets/crm documents as Account, visible to '
+      'Executive and Sales', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'petsupo-partner-crm',
+      path: 'crm/petsupo-partner-crm',
+      content: 'CRM tool for Petsupo partners.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.account);
+    expect(fact.visibleTo, {Department.executive, Department.sales});
+  });
+
+  test('extract() classifies assets/finance documents by name: '
+      'PaymentProvider for "payment", Account for "account", Subscription '
+      'otherwise', () {
+    const extractor = FactExtractor();
+    const paymentDocument = CompanyDocument(
+      category: 'assets',
+      name: 'payment-providers',
+      path: 'finance/payment-providers',
+      content: 'Payment providers in use.',
+    );
+    const accountDocument = CompanyDocument(
+      category: 'assets',
+      name: 'bank-accounts',
+      path: 'finance/bank-accounts',
+      content: 'Bank accounts.',
+    );
+    const otherDocument = CompanyDocument(
+      category: 'assets',
+      name: 'billing-cycle',
+      path: 'finance/billing-cycle',
+      content: 'Billing cadence.',
+    );
+
+    final facts = extractor.extract([
+      paymentDocument,
+      accountDocument,
+      otherDocument,
+    ]);
+
+    expect(facts[0].type, FactType.paymentProvider);
+    expect(facts[1].type, FactType.account);
+    expect(facts[2].type, FactType.subscription);
+    for (final fact in facts) {
+      expect(fact.visibleTo, {Department.executive, Department.finance});
+    }
+  });
+
+  test('extract() falls back to the legacy brand/media heuristic for an '
+      'unrecognized assets subfolder', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'brand-kit',
+      path: 'unrecognized-subfolder/brand-kit',
+      content: 'Something unexpected.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.type, FactType.brandAsset);
+  });
+
+  test('extract() preserves the full path in sources for traceability', () {
+    const extractor = FactExtractor();
+    const document = CompanyDocument(
+      category: 'assets',
+      name: 'instagram',
+      path: 'social/instagram',
+      content: 'Instagram account.',
+    );
+
+    final fact = extractor.extract([document]).single;
+
+    expect(fact.sources, ['assets/social/instagram']);
+  });
 }

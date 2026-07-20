@@ -13,13 +13,32 @@ class KnowledgeGraph {
 
   List<CompanyFact> capabilities() => factsByType(FactType.capability);
 
+  List<CompanyFact> services() => factsByType(FactType.service);
+
   List<CompanyFact> socialAccounts() => factsByType(FactType.socialAccount);
 
   List<CompanyFact> websites() => factsByType(FactType.website);
 
+  List<CompanyFact> domains() => factsByType(FactType.domain);
+
+  List<CompanyFact> brandAssets() => factsByType(FactType.brandAsset);
+
+  List<CompanyFact> mediaAssets() => factsByType(FactType.mediaAsset);
+
+  List<CompanyFact> seoAssets() => factsByType(FactType.seoAsset);
+
+  List<CompanyFact> analyticsPlatforms() =>
+      factsByType(FactType.analyticsPlatform);
+
+  List<CompanyFact> repositories() => factsByType(FactType.repository);
+
   List<CompanyFact> competitors() => factsByType(FactType.competitor);
 
   List<CompanyFact> technologies() => factsByType(FactType.technology);
+
+  List<CompanyFact> paymentProviders() => factsByType(FactType.paymentProvider);
+
+  List<CompanyFact> subscriptions() => factsByType(FactType.subscription);
 
   List<CompanyFact> marketingAssets() => [
     ...factsByType(FactType.brandAsset),

@@ -102,11 +102,21 @@ class CompanyLoader {
           category: category,
           name: p.basenameWithoutExtension(file.path),
           content: await file.readAsString(),
+          path: _relativePath(file, directory),
         ),
       );
     }
 
     return documents;
+  }
+
+  /// The file's location relative to its category directory, including
+  /// subfolders, without extension, always using "/" as the separator
+  /// regardless of platform.
+  String _relativePath(File file, Directory categoryDirectory) {
+    final relative = p.relative(file.path, from: categoryDirectory.path);
+
+    return p.split(p.withoutExtension(relative)).join('/');
   }
 
   /// True when [path] itself, or any path segment between [root] and the
