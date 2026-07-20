@@ -1,5 +1,6 @@
 import 'package:pharos_ai_runtime/company/department.dart';
 import 'package:pharos_ai_runtime/company/department_facts.dart';
+import 'package:pharos_ai_runtime/knowledge/fact_type.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_graph.dart';
 import 'package:pharos_ai_runtime/operations/decision_gate.dart';
 import 'package:pharos_ai_runtime/operations/operational_state.dart';
@@ -34,6 +35,7 @@ class OperationalSnapshot {
     required this.blocked,
     required this.observabilityScore,
     required this.missingOperationalData,
+    required this.missingFactTypes,
   });
 
   factory OperationalSnapshot.build({
@@ -80,6 +82,7 @@ class OperationalSnapshot {
       blocked: blocked,
       observabilityScore: observabilityScore,
       missingOperationalData: missingOperationalData.toList(),
+      missingFactTypes: departmentFacts.missingTypes,
     );
   }
 
@@ -102,4 +105,9 @@ class OperationalSnapshot {
   /// department, deduplicated. Never fabricated: always reported, never
   /// guessed.
   final List<String> missingOperationalData;
+
+  /// Fact types relevant to this department that have no known fact at
+  /// all yet (passed through from DepartmentFacts) — distinct from a
+  /// known fact with an unresolved readiness signal.
+  final List<FactType> missingFactTypes;
 }
