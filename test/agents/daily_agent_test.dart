@@ -64,8 +64,7 @@ void main() {
     expect(agent.id, 'daily');
   });
 
-  test('run() sends exactly one request to the ModelProvider for the whole '
-      'Company Plan', () async {
+  test('run() sends exactly one request to the ModelProvider', () async {
     final modelProvider = _SpyModelProvider();
     final agent = DailyAgent(workspaceRoot: workspace.path);
 
@@ -74,12 +73,13 @@ void main() {
     expect(modelProvider.capturedRequest, isNotNull);
   });
 
-  test('run() sends a prompt grounded per department, not a generic company '
-      'summary', () async {
-    final companyDir = Directory('${workspace.path}/company')..createSync();
-    File(
-      '${companyDir.path}/overview.md',
-    ).writeAsStringSync('# Overview\n\nWe build developer tools.');
+  test('run() never sends raw HQ markdown to the LLM: the prompt contains '
+      'only the extracted fact name, never the document body', () async {
+    final productsDir = Directory('${workspace.path}/products')..createSync();
+    File('${productsDir.path}/petsupo.md').writeAsStringSync(
+      '# Petsupo\n\n'
+      'This exact raw markdown sentence must never reach the LLM.',
+    );
 
     final modelProvider = _SpyModelProvider();
     final agent = DailyAgent(workspaceRoot: workspace.path);
@@ -91,18 +91,18 @@ void main() {
         .single
         .content;
 
-    expect(prompt, contains('Executive Snapshot:'));
-    expect(prompt, contains('Engineering Snapshot:'));
-    expect(prompt, contains('Marketing Snapshot:'));
-    expect(prompt, contains('Sales Snapshot:'));
-    expect(prompt, contains('Operations Snapshot:'));
-    expect(prompt, contains('Finance Snapshot:'));
-    expect(prompt, contains("Today's Executive Priorities"));
-    expect(prompt, contains("Today's Finance Priorities"));
-    expect(prompt, contains('We build developer tools.'));
+    expect(prompt, contains('Product: petsupo'));
+    expect(
+      prompt,
+      isNot(
+        contains('This exact raw markdown sentence must never reach the LLM'),
+      ),
+    );
+    expect(prompt, isNot(contains('products/petsupo')));
   });
 
-  test('run() prompt contains hallucination-prevention rules', () async {
+  test('run() sends a prompt grounded per department, one Facts section '
+      'each', () async {
     final modelProvider = _SpyModelProvider();
     final agent = DailyAgent(workspaceRoot: workspace.path);
 
@@ -113,19 +113,17 @@ void main() {
         .single
         .content;
 
-    expect(prompt, contains('Never invent company facts'));
-    expect(prompt, contains('Never invent KPIs'));
-    expect(prompt, contains('Never invent campaigns'));
+    expect(prompt, contains('Executive Facts:'));
+    expect(prompt, contains('Engineering Facts:'));
+    expect(prompt, contains('Marketing Facts:'));
+    expect(prompt, contains('Sales Facts:'));
+    expect(prompt, contains('Operations Facts:'));
+    expect(prompt, contains('Finance Facts:'));
   });
 
-  test('run() prints PHAROS TODAY, the generated Company Plan, and '
-      'Runtime-rendered Blocked Items, Missing Data, and Recommended Next '
+  test('run() prints PHAROS TODAY, the generated Executive Plan, and '
+      'Runtime-rendered Blocked Items, Missing Facts, and Recommended Next '
       'Connections sections', () async {
-    final companyDir = Directory('${workspace.path}/company')..createSync();
-    File(
-      '${companyDir.path}/overview.md',
-    ).writeAsStringSync('Overview content.');
-
     final modelProvider = _SpyModelProvider()
       ..response = const ModelResponse(
         text: "Today's Executive Priorities\nStabilize the roadmap.",
@@ -140,7 +138,7 @@ void main() {
     expect(report, contains('PHAROS TODAY'));
     expect(report, contains('Stabilize the roadmap.'));
     expect(report, contains('Blocked Items'));
-    expect(report, contains('Missing Data'));
+    expect(report, contains('Missing Facts'));
     expect(report, contains('Recommended Next Connections'));
   });
 

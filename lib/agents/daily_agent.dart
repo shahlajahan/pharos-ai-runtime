@@ -1,12 +1,13 @@
 import 'dart:io';
 
-import 'package:pharos_ai_runtime/company/company_context_builder.dart';
 import 'package:pharos_ai_runtime/company/company_loader.dart';
-import 'package:pharos_ai_runtime/company/department_context_builder.dart';
-import 'package:pharos_ai_runtime/company/department_snapshot.dart';
+import 'package:pharos_ai_runtime/company/department_facts.dart';
 import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
+import 'package:pharos_ai_runtime/knowledge/department_fact_builder.dart';
+import 'package:pharos_ai_runtime/knowledge/fact_extractor.dart';
+import 'package:pharos_ai_runtime/knowledge/knowledge_graph_builder.dart';
 import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
 import 'package:pharos_ai_runtime/prompts/department_prompt_builder.dart';
@@ -14,13 +15,12 @@ import 'package:pharos_ai_runtime/prompts/department_prompt_builder.dart';
 const _doubleLine = '══════════════════════════════';
 const _defaultWorkspaceRoot = 'pharos-hq';
 
-/// Generates today's department-based Company Plan, grounded on the HQ
-/// Workspace: Load HQ -> Company Context -> Department Context Builder ->
-/// Department Snapshots -> Department Prompt Builder -> LLM -> Today's
-/// Company Plan. The Daily Agent never decides department scope itself
-/// and never assembles prompts inline — only already-computed
-/// DepartmentSnapshots reach the prompt, and only the LLM writes each
-/// department's priorities.
+/// Generates today's Executive Plan, grounded exclusively on the Company
+/// Knowledge Graph: Load HQ -> Company Documents -> Fact Extraction ->
+/// Knowledge Graph -> Department Facts -> Department Prompt Builder ->
+/// LLM -> Executive Plan. FactExtractor is the only place HQ document
+/// content is ever read — the Daily Agent never inspects markdown
+/// directly, and only already-computed DepartmentFacts reach the prompt.
 class DailyAgent extends Agent {
   DailyAgent({String? workspaceRoot})
     : _workspaceRoot =
@@ -36,22 +36,18 @@ class DailyAgent extends Agent {
   @override
   Future<Result> run(ExecutionContext context) async {
     const loader = CompanyLoader();
-    const contextBuilder = CompanyContextBuilder();
-    const departmentContextBuilder = DepartmentContextBuilder();
+    const factExtractor = FactExtractor();
+    const graphBuilder = KnowledgeGraphBuilder();
+    const departmentFactBuilder = DepartmentFactBuilder();
     const promptBuilder = DepartmentPromptBuilder();
 
     final documents = await loader.load(_workspaceRoot);
-    final companyContext = contextBuilder.build(documents);
-    final departmentContexts = departmentContextBuilder.buildAll(
-      companyContext,
-    );
-    final snapshots = [
-      for (final departmentContext in departmentContexts)
-        DepartmentSnapshot.fromContext(departmentContext),
-    ];
+    final facts = factExtractor.extract(documents);
+    final graph = graphBuilder.build(facts);
+    final departmentFacts = departmentFactBuilder.buildAll(graph);
 
     final prompt = promptBuilder.buildReport(
-      snapshots: snapshots,
+      departmentFacts: departmentFacts,
       currentDate: DateTime.now(),
     );
 
@@ -67,23 +63,26 @@ class DailyAgent extends Agent {
     print('');
     print(response.text);
     print('');
-    print(_renderBlockedItems(snapshots));
+    print(_renderBlockedItems(departmentFacts));
     print('');
-    print(_renderMissingData(snapshots));
+    print(_renderMissingFacts(departmentFacts));
     print('');
-    print(_renderRecommendedNextConnections(snapshots));
+    print(_renderRecommendedNextConnections(departmentFacts));
 
-    return Result.success("Today's Company Plan generated successfully.");
+    return Result.success("Today's Executive Plan generated successfully.");
   }
 
   /// Deterministically rendered by the Runtime from the already-computed
-  /// DepartmentSnapshots — never left to the LLM, since identifying
-  /// blockers and gaps is exactly the kind of inference the LLM must
-  /// never perform.
-  String _renderBlockedItems(List<DepartmentSnapshot> snapshots) {
+  /// DepartmentFacts — never left to the LLM, since identifying blockers
+  /// and gaps is exactly the kind of inference the LLM must never
+  /// perform.
+  String _renderBlockedItems(List<DepartmentFacts> departmentFacts) {
     final buffer = StringBuffer()..writeln('Blocked Items');
     final items = _dedupe([
-      for (final snapshot in snapshots) ...snapshot.blockedItems,
+      for (final facts in departmentFacts)
+        for (final type in facts.missingTypes)
+          '${facts.department.displayName} cannot fully plan today '
+              'without ${type.displayName} facts — none are known yet.',
     ]);
 
     if (items.isEmpty) {
@@ -97,10 +96,11 @@ class DailyAgent extends Agent {
     return buffer.toString().trimRight();
   }
 
-  String _renderMissingData(List<DepartmentSnapshot> snapshots) {
-    final buffer = StringBuffer()..writeln('Missing Data');
+  String _renderMissingFacts(List<DepartmentFacts> departmentFacts) {
+    final buffer = StringBuffer()..writeln('Missing Facts');
     final missing = _dedupe([
-      for (final snapshot in snapshots) ...snapshot.missingData,
+      for (final facts in departmentFacts)
+        for (final type in facts.missingTypes) type.displayName,
     ]);
 
     if (missing.isEmpty) {
@@ -114,10 +114,13 @@ class DailyAgent extends Agent {
     return buffer.toString().trimRight();
   }
 
-  String _renderRecommendedNextConnections(List<DepartmentSnapshot> snapshots) {
+  String _renderRecommendedNextConnections(
+    List<DepartmentFacts> departmentFacts,
+  ) {
     final buffer = StringBuffer()..writeln('Recommended Next Connections');
     final missing = _dedupe([
-      for (final snapshot in snapshots) ...snapshot.missingData,
+      for (final facts in departmentFacts)
+        for (final type in facts.missingTypes) type.displayName,
     ]);
 
     if (missing.isEmpty) {

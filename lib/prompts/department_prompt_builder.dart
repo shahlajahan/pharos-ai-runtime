@@ -1,38 +1,38 @@
-import 'package:pharos_ai_runtime/company/department_snapshot.dart';
+import 'package:pharos_ai_runtime/company/department_facts.dart';
+import 'package:pharos_ai_runtime/knowledge/company_fact.dart';
+import 'package:pharos_ai_runtime/knowledge/fact_type.dart';
 
 /// Builds the grounded prompt sent to the LLM for one Department, and
 /// composes every department's prompt into the single request DailyAgent
-/// sends for the full daily plan. Pure and deterministic: the same
-/// DepartmentSnapshots and date always produce the same prompt.
+/// sends for the full daily plan. The prompt receives only structured
+/// CompanyFacts — never raw HQ markdown. Pure and deterministic: the
+/// same DepartmentFacts and date always produce the same prompt.
 class DepartmentPromptBuilder {
   const DepartmentPromptBuilder();
 
   String build({
-    required DepartmentSnapshot snapshot,
+    required DepartmentFacts departmentFacts,
     required DateTime currentDate,
   }) {
-    final department = snapshot.department.displayName;
+    final department = departmentFacts.department.displayName;
 
     final buffer = StringBuffer()
-      ..writeln('$department Snapshot:')
-      ..write(_renderSection('Company', snapshot.company))
-      ..write(_renderSection('Knowledge', snapshot.knowledge))
-      ..write(_renderSection('Products', snapshot.products))
-      ..write(_renderSection('Assets', snapshot.assets))
-      ..write(_renderSection('Services', snapshot.services))
-      ..write(_renderSection('Websites', snapshot.websites))
-      ..write(_renderSection('Social', snapshot.social))
-      ..write(_renderSection('Analytics', snapshot.analytics))
-      ..writeln('Known Data: ${_joinOrNone(snapshot.knownData)}')
-      ..writeln('Missing Data: ${_joinOrNone(snapshot.missingData)}')
-      ..writeln()
+      ..writeln('$department Facts:')
+      ..write(_renderFacts(departmentFacts.facts))
       ..writeln(
-        "Using ONLY the $department Snapshot above, write today's "
+        'Missing Facts: ${_joinTypesOrNone(departmentFacts.missingTypes)}',
+      )
+      ..writeln()
+      ..writeln('Reasoning Goal:')
+      ..writeln(
+        "Using ONLY the $department Facts above, write today's "
         '$department Priorities: a short, concrete, actionable list. '
-        'Never invent facts, KPIs, campaigns, or business metrics. '
-        'Distinguish clearly between what is known and what is a '
-        'recommendation. If there is not enough evidence to recommend '
-        'something specific, explicitly say so instead of guessing.',
+        'Every recommendation must cite the CompanyFact type(s) it is '
+        'based on as Evidence, and state a Confidence level (High, '
+        'Medium, or Low). Never invent facts, KPIs, campaigns, or '
+        'business metrics. Never make a recommendation without evidence. '
+        'If a Missing Fact would be required to make a specific '
+        'recommendation, explicitly say so instead of guessing.',
       );
 
     return buffer.toString();
@@ -41,68 +41,69 @@ class DepartmentPromptBuilder {
   /// Composes every department's prompt into the single request sent for
   /// the full daily plan, in a fixed department order.
   String buildReport({
-    required List<DepartmentSnapshot> snapshots,
+    required List<DepartmentFacts> departmentFacts,
     required DateTime currentDate,
   }) {
     final buffer = StringBuffer()
-      ..writeln("You are preparing today's Pharos Company Plan.")
+      ..writeln("You are preparing today's Pharos Executive Plan.")
       ..writeln()
       ..writeln('Current date: ${currentDate.toIso8601String()}')
       ..writeln()
       ..writeln('Rules:')
-      ..writeln('- Reason only over the Department Snapshots below.')
+      ..writeln('- Reason only over the Department Facts below.')
       ..writeln('- Never invent company facts.')
       ..writeln('- Never invent KPIs.')
       ..writeln('- Never invent campaigns.')
       ..writeln('- Never invent business metrics.')
+      ..writeln('- Never classify documents or discover products yourself.')
       ..writeln(
         '- If information is unavailable, explicitly state that it is '
         'unavailable rather than guessing.',
       )
       ..writeln(
-        '- Distinguish clearly between Known, Unknown, and Recommendation.',
+        '- Distinguish clearly between Known, Missing, and Recommendation.',
       )
       ..writeln();
 
-    for (final snapshot in snapshots) {
+    for (final facts in departmentFacts) {
       buffer
-        ..writeln(build(snapshot: snapshot, currentDate: currentDate))
+        ..writeln(build(departmentFacts: facts, currentDate: currentDate))
         ..writeln();
     }
 
     buffer.writeln(
-      "Using ONLY the Department Snapshots above, write today's Company "
+      "Using ONLY the Department Facts above, write today's Executive "
       'Plan with exactly one heading per department, in this order:',
     );
 
-    for (final snapshot in snapshots) {
-      buffer.writeln("Today's ${snapshot.department.displayName} Priorities");
+    for (final facts in departmentFacts) {
+      buffer.writeln("Today's ${facts.department.displayName} Priorities");
     }
 
     buffer
       ..writeln()
       ..writeln(
-        'Do not include Blocked Items, Missing Data, or Recommended Next '
+        'Do not include Blocked Items, Missing Facts, or Recommended Next '
         'Connections sections — the Runtime appends them automatically.',
       );
 
     return buffer.toString();
   }
 
-  String _renderSection(String title, List<String> entries) {
-    final buffer = StringBuffer()..writeln('$title:');
+  String _renderFacts(List<CompanyFact> facts) {
+    final buffer = StringBuffer()..writeln('Facts:');
 
-    if (entries.isEmpty) {
-      buffer.writeln('- Not yet connected.');
+    if (facts.isEmpty) {
+      buffer.writeln('- None known.');
     } else {
-      for (final entry in entries) {
-        buffer.writeln('- $entry');
+      for (final fact in facts) {
+        buffer.writeln('- ${fact.type.displayName}: ${fact.name}');
       }
     }
 
     return buffer.toString();
   }
 
-  String _joinOrNone(List<String> entries) =>
-      entries.isEmpty ? 'None' : entries.join(', ');
+  String _joinTypesOrNone(List<FactType> types) =>
+      types.isEmpty ? 'None' : types.map((type) => type.displayName).join(', ');
 }
