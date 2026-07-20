@@ -1,22 +1,25 @@
 import 'dart:io';
 
-import 'package:pharos_ai_runtime/company/company_context.dart';
 import 'package:pharos_ai_runtime/company/company_context_builder.dart';
 import 'package:pharos_ai_runtime/company/company_loader.dart';
+import 'package:pharos_ai_runtime/company/company_snapshot.dart';
+import 'package:pharos_ai_runtime/company/company_snapshot_builder.dart';
 import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
 import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/prompts/daily_prompt_builder.dart';
 
 const _doubleLine = '══════════════════════════════';
 const _defaultWorkspaceRoot = 'pharos-hq';
+const _workflowGoal = 'Generate the daily executive report.';
 
-/// Generates the daily company report, grounded on the HQ Workspace:
-/// Load HQ -> Build Company Context -> Build Daily Prompt -> Call LLM.
-/// The Runtime never assumes company information is embedded inside
-/// prompts — everything the LLM is told about the company comes from
-/// documents actually found under the HQ workspace root.
+/// Generates the Executive Daily Report, grounded on the HQ Workspace:
+/// Load HQ -> Company Context -> Company Snapshot -> Daily Prompt
+/// Builder -> LLM -> Executive Report. The Daily Agent never assembles
+/// prompts inline and never reasons over CompanyContext directly — only
+/// the normalized, deterministic CompanySnapshot reaches the prompt.
 class DailyAgent extends Agent {
   DailyAgent({String? workspaceRoot})
     : _workspaceRoot =
@@ -32,16 +35,23 @@ class DailyAgent extends Agent {
   @override
   Future<Result> run(ExecutionContext context) async {
     const loader = CompanyLoader();
-    const builder = CompanyContextBuilder();
+    const contextBuilder = CompanyContextBuilder();
+    const snapshotBuilder = CompanySnapshotBuilder();
+    const promptBuilder = DailyPromptBuilder();
 
     final documents = await loader.load(_workspaceRoot);
-    final companyContext = builder.build(documents);
+    final companyContext = contextBuilder.build(documents);
+    final snapshot = snapshotBuilder.build(companyContext);
+
+    final prompt = promptBuilder.build(
+      snapshot: snapshot,
+      currentDate: DateTime.now(),
+      workflowGoal: _workflowGoal,
+    );
 
     final response = await context.modelProvider.generate(
       ModelRequest(
-        conversation: Conversation(
-          messages: [UserMessage(content: _buildPrompt(companyContext))],
-        ),
+        conversation: Conversation(messages: [UserMessage(content: prompt)]),
       ),
     );
 
@@ -50,54 +60,27 @@ class DailyAgent extends Agent {
     print(_doubleLine);
     print('');
     print(response.text);
+    print('');
+    print(_renderDataSourcesUsed(snapshot));
 
     return Result.success('Daily report generated successfully.');
   }
 
-  String _buildPrompt(CompanyContext context) {
-    final buffer = StringBuffer()
-      ..writeln('You are writing today\'s internal Pharos company report.')
-      ..writeln()
-      ..writeln('Rules:')
-      ..writeln('- Never invent company facts.')
-      ..writeln('- Use only the Company Context supplied below.')
-      ..writeln(
-        '- If information is unavailable, explicitly state that it is '
-        'unavailable.',
-      )
-      ..writeln(
-        '- Never fabricate KPIs, campaigns, revenue, customers, metrics, '
-        'analytics, or marketing activities.',
-      )
-      ..writeln(
-        '- Prefer "Unknown", "Unavailable", or "Not yet connected" over '
-        'fabricated information.',
-      )
-      ..writeln()
-      ..writeln('Company Context:')
-      ..write(_renderSection('Company', context.company))
-      ..write(_renderSection('Knowledge', context.knowledge))
-      ..write(_renderSection('Products', context.products))
-      ..write(_renderSection('Assets', context.assets))
-      ..write(_renderSection('Services', context.services))
-      ..write(_renderSection('Websites', context.websites))
-      ..write(_renderSection('Social', context.social))
-      ..write(_renderSection('Analytics', context.analytics));
+  /// Deterministically rendered by the Runtime from the already-computed
+  /// CompanySnapshot — never left to the LLM, since discovering which
+  /// sources contributed is exactly the kind of inference the LLM must
+  /// never perform.
+  String _renderDataSourcesUsed(CompanySnapshot snapshot) {
+    final buffer = StringBuffer()..writeln('Data Sources Used');
 
-    return buffer.toString();
-  }
-
-  String _renderSection(String title, List<String> entries) {
-    final buffer = StringBuffer()..writeln('$title:');
-
-    if (entries.isEmpty) {
-      buffer.writeln('- Not yet connected.');
-    } else {
-      for (final entry in entries) {
-        buffer.writeln('- $entry');
-      }
+    for (final category in snapshot.knownData) {
+      buffer.writeln('✓ $category');
     }
 
-    return buffer.toString();
+    for (final category in snapshot.missingData) {
+      buffer.writeln('✗ $category');
+    }
+
+    return buffer.toString().trimRight();
   }
 }

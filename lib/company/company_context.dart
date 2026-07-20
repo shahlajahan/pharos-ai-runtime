@@ -3,6 +3,11 @@
 /// markdown: every entry is one normalized line per loaded document.
 /// Sections a connector or category has not populated stay empty rather
 /// than being invented.
+///
+/// CompanyContext is an intermediate representation: agents no longer
+/// build prompts from it directly. CompanySnapshotBuilder consumes it to
+/// produce a CompanySnapshot — deduplicated, with empty and permanently
+/// missing categories identified — which is what prompts are built from.
 class CompanyContext {
   const CompanyContext({
     required this.company,

@@ -90,17 +90,53 @@ void main() {
     expect(documents.single.name, 'overview');
   });
 
-  test('load() only reads files, never recurses into subdirectories', () async {
-    final companyDir = Directory('${workspace.path}/company')..createSync();
-    Directory('${companyDir.path}/nested').createSync();
+  test(
+    'load() discovers markdown files nested arbitrarily deep under a '
+    'category, matching how real HQ workspaces are actually laid out '
+    '(for example products/petsupo/overview.md, not products/overview.md)',
+    () async {
+      final productDir = Directory('${workspace.path}/products/petsupo')
+        ..createSync(recursive: true);
+      File(
+        '${productDir.path}/overview.md',
+      ).writeAsStringSync('# Petsupo\n\nA pet care marketplace.');
+
+      final deeplyNestedDir = Directory(
+        '${workspace.path}/knowledge/engineering/flutter',
+      )..createSync(recursive: true);
+      File(
+        '${deeplyNestedDir.path}/architecture.md',
+      ).writeAsStringSync('# Architecture\n\nClean architecture.');
+
+      const loader = CompanyLoader();
+      final documents = await loader.load(workspace.path);
+
+      expect(documents, hasLength(2));
+      expect(
+        documents.any((d) => d.category == 'products' && d.name == 'overview'),
+        isTrue,
+      );
+      expect(
+        documents.any(
+          (d) => d.category == 'knowledge' && d.name == 'architecture',
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test('load() ignores non-markdown files, even when nested', () async {
+    final assetsDir = Directory('${workspace.path}/assets/brand')
+      ..createSync(recursive: true);
+    File('${assetsDir.path}/logo.png').writeAsStringSync('not markdown');
     File(
-      '${companyDir.path}/overview.md',
-    ).writeAsStringSync('Overview content');
+      '${assetsDir.path}/guidelines.md',
+    ).writeAsStringSync('Brand guidelines.');
 
     const loader = CompanyLoader();
     final documents = await loader.load(workspace.path);
 
     expect(documents, hasLength(1));
-    expect(documents.single.name, 'overview');
+    expect(documents.single.name, 'guidelines');
   });
 }

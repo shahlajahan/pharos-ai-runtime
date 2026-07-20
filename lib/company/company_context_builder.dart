@@ -1,5 +1,6 @@
 import 'package:pharos_ai_runtime/company/company_context.dart';
 import 'package:pharos_ai_runtime/company/company_document.dart';
+import 'package:pharos_ai_runtime/core/logger.dart';
 
 /// Transforms loaded CompanyDocuments into one CompanyContext. Only
 /// context assembly: no LLM calls, no business decisions, no prompt
@@ -7,8 +8,10 @@ import 'package:pharos_ai_runtime/company/company_document.dart';
 class CompanyContextBuilder {
   const CompanyContextBuilder();
 
+  static const Logger _logger = Logger();
+
   CompanyContext build(List<CompanyDocument> documents) {
-    return CompanyContext(
+    final context = CompanyContext(
       company: _section(documents, 'company'),
       knowledge: _section(documents, 'knowledge'),
       products: _section(documents, 'products'),
@@ -18,6 +21,19 @@ class CompanyContextBuilder {
       social: _section(documents, 'social'),
       analytics: _section(documents, 'analytics'),
     );
+
+    _logger.debug(
+      'CompanyContextBuilder: company=${context.company.length} '
+      'knowledge=${context.knowledge.length} '
+      'products=${context.products.length} '
+      'assets=${context.assets.length} '
+      'services=${context.services.length} '
+      'websites=${context.websites.length} '
+      'social=${context.social.length} '
+      'analytics=${context.analytics.length}',
+    );
+
+    return context;
   }
 
   List<String> _section(List<CompanyDocument> documents, String category) {

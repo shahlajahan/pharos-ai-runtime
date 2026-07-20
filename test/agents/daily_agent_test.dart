@@ -12,7 +12,7 @@ import 'package:test/test.dart';
 
 class _SpyModelProvider extends ModelProvider {
   ModelRequest? capturedRequest;
-  ModelResponse response = const ModelResponse(text: 'Grounded report.');
+  ModelResponse response = const ModelResponse(text: 'Executive report body.');
 
   @override
   Future<ModelResponse> generate(ModelRequest request) async {
@@ -71,8 +71,10 @@ void main() {
     expect(modelProvider.capturedRequest, isNotNull);
   });
 
-  test("run() uses the CompanyContext built from HQ: loaded documents' "
-      'content reaches the prompt', () async {
+  test('run() uses CompanySnapshot rather than CompanyContext directly: the '
+      'sent prompt is shaped like a DailyPromptBuilder prompt (Company '
+      'Snapshot, Known Data, Missing Data, Risks), not a raw Company '
+      'Context dump', () async {
     final companyDir = Directory('${workspace.path}/company')..createSync();
     File(
       '${companyDir.path}/overview.md',
@@ -88,7 +90,15 @@ void main() {
         .single
         .content;
 
+    expect(prompt, contains('Company Snapshot:'));
+    expect(prompt, contains('Known Data:'));
+    expect(prompt, contains('Missing Data:'));
+    expect(prompt, contains('Risks:'));
+    expect(prompt, contains('Recommendations Input:'));
     expect(prompt, contains('We build developer tools.'));
+    // The old CompanyContext-style prompt never mentioned a workflow
+    // goal or distinguished Known/Unknown/Recommendation.
+    expect(prompt, contains('Workflow goal:'));
   });
 
   test('run() prompt contains the hallucination prevention rules', () async {
@@ -103,37 +113,26 @@ void main() {
         .content;
 
     expect(prompt, contains('Never invent company facts'));
+    expect(prompt, contains('Never invent KPIs'));
+    expect(prompt, contains('Never invent campaigns'));
+    expect(prompt, contains('Never invent analytics'));
+    expect(prompt, contains('Never invent revenue'));
     expect(prompt, contains('unavailable'));
+    expect(prompt, contains('Known'));
     expect(prompt, contains('Unknown'));
-    expect(prompt, contains('KPIs'));
-    expect(prompt, contains('campaigns'));
-    expect(prompt, contains('revenue'));
-    expect(prompt, contains('customers'));
-    expect(prompt, contains('metrics'));
-    expect(prompt, contains('analytics'));
-    expect(prompt, contains('marketing activities'));
+    expect(prompt, contains('Recommendation'));
   });
 
-  test('run() reports sections with no HQ documents as "Not yet connected" '
-      'rather than fabricating content for them', () async {
-    // An empty workspace: nothing under any category folder.
-    final modelProvider = _SpyModelProvider();
-    final agent = DailyAgent(workspaceRoot: workspace.path);
+  test('run() prints PHAROS DAILY REPORT, the generated Executive Report, '
+      'and a Data Sources Used section', () async {
+    final companyDir = Directory('${workspace.path}/company')..createSync();
+    File(
+      '${companyDir.path}/overview.md',
+    ).writeAsStringSync('Overview content.');
 
-    await agent.run(_context(modelProvider));
-
-    final prompt = modelProvider.capturedRequest!.conversation.messages
-        .whereType<UserMessage>()
-        .single
-        .content;
-
-    expect(prompt, contains('Not yet connected'));
-  });
-
-  test('run() prints PHAROS DAILY REPORT and the generated response', () async {
     final modelProvider = _SpyModelProvider()
       ..response = const ModelResponse(
-        text: 'No live analytics are currently connected.',
+        text: 'Executive Summary\nEverything looks stable.',
       );
     final agent = DailyAgent(workspaceRoot: workspace.path);
 
@@ -143,7 +142,10 @@ void main() {
     final report = output.join('\n');
 
     expect(report, contains('PHAROS DAILY REPORT'));
-    expect(report, contains('No live analytics are currently connected.'));
+    expect(report, contains('Everything looks stable.'));
+    expect(report, contains('Data Sources Used'));
+    expect(report, contains('✓ Company'));
+    expect(report, contains('✗ CRM'));
   });
 
   test('run() returns a success Result', () async {
