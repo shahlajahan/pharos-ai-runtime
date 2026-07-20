@@ -73,13 +73,17 @@ void main() {
     expect(modelProvider.capturedRequest, isNotNull);
   });
 
-  test('run() never sends raw HQ markdown to the LLM: the prompt contains '
-      'only the extracted fact name, never the document body', () async {
+  test('run() sends a prompt grounded in Operational State, marking an '
+      'existence-only fact as allowed for action and a Website as blocked '
+      'pending readiness evidence', () async {
     final productsDir = Directory('${workspace.path}/products')..createSync();
-    File('${productsDir.path}/petsupo.md').writeAsStringSync(
-      '# Petsupo\n\n'
-      'This exact raw markdown sentence must never reach the LLM.',
-    );
+    File(
+      '${productsDir.path}/petsupo.md',
+    ).writeAsStringSync('# Petsupo\n\nA pet care marketplace.');
+    final websitesDir = Directory('${workspace.path}/websites')..createSync();
+    File(
+      '${websitesDir.path}/petsupo-com.md',
+    ).writeAsStringSync('Marketing website.');
 
     final modelProvider = _SpyModelProvider();
     final agent = DailyAgent(workspaceRoot: workspace.path);
@@ -91,42 +95,53 @@ void main() {
         .single
         .content;
 
-    expect(prompt, contains('Product: petsupo'));
-    expect(
-      prompt,
-      isNot(
-        contains('This exact raw markdown sentence must never reach the LLM'),
-      ),
-    );
-    expect(prompt, isNot(contains('products/petsupo')));
+    expect(prompt, contains('Marketing Operational State:'));
+    expect(prompt, contains('reachable=Unknown'));
+    expect(prompt, contains('Allowed for action recommendations: petsupo'));
+    expect(prompt, contains('Blocked (insufficient evidence): petsupo-com'));
   });
 
-  test('run() sends a prompt grounded per department, one Facts section '
-      'each', () async {
-    final modelProvider = _SpyModelProvider();
-    final agent = DailyAgent(workspaceRoot: workspace.path);
+  test(
+    'run() never sends raw HQ markdown or a filesystem path to the LLM',
+    () async {
+      final productsDir = Directory('${workspace.path}/products')..createSync();
+      File('${productsDir.path}/petsupo.md').writeAsStringSync(
+        '# Petsupo\n\n'
+        'This exact raw markdown sentence must never reach the LLM.',
+      );
 
-    await agent.run(_context(modelProvider));
+      final modelProvider = _SpyModelProvider();
+      final agent = DailyAgent(workspaceRoot: workspace.path);
 
-    final prompt = modelProvider.capturedRequest!.conversation.messages
-        .whereType<UserMessage>()
-        .single
-        .content;
+      await agent.run(_context(modelProvider));
 
-    expect(prompt, contains('Executive Facts:'));
-    expect(prompt, contains('Engineering Facts:'));
-    expect(prompt, contains('Marketing Facts:'));
-    expect(prompt, contains('Sales Facts:'));
-    expect(prompt, contains('Operations Facts:'));
-    expect(prompt, contains('Finance Facts:'));
-  });
+      final prompt = modelProvider.capturedRequest!.conversation.messages
+          .whereType<UserMessage>()
+          .single
+          .content;
+
+      expect(
+        prompt,
+        isNot(
+          contains('This exact raw markdown sentence must never reach the LLM'),
+        ),
+      );
+      expect(prompt, isNot(contains('products/petsupo')));
+      expect(prompt, isNot(contains('.md')));
+    },
+  );
 
   test('run() prints PHAROS TODAY, the generated Executive Plan, and '
-      'Runtime-rendered Blocked Items, Missing Facts, and Recommended Next '
-      'Connections sections', () async {
+      'Runtime-rendered Blocked Items, Missing Operational Data, and '
+      'Recommended Next Connections sections', () async {
+    final websitesDir = Directory('${workspace.path}/websites')..createSync();
+    File(
+      '${websitesDir.path}/petsupo-com.md',
+    ).writeAsStringSync('Marketing website.');
+
     final modelProvider = _SpyModelProvider()
       ..response = const ModelResponse(
-        text: "Today's Executive Priorities\nStabilize the roadmap.",
+        text: "Today's Marketing Priorities\nImprove observability.",
       );
     final agent = DailyAgent(workspaceRoot: workspace.path);
 
@@ -136,10 +151,11 @@ void main() {
     final report = output.join('\n');
 
     expect(report, contains('PHAROS TODAY'));
-    expect(report, contains('Stabilize the roadmap.'));
+    expect(report, contains('Improve observability.'));
     expect(report, contains('Blocked Items'));
-    expect(report, contains('Missing Facts'));
+    expect(report, contains('Missing Operational Data'));
     expect(report, contains('Recommended Next Connections'));
+    expect(report, contains('cannot recommend action on petsupo-com'));
   });
 
   test('run() returns a success Result', () async {

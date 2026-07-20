@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:pharos_ai_runtime/company/company_loader.dart';
-import 'package:pharos_ai_runtime/company/department_facts.dart';
 import 'package:pharos_ai_runtime/core/agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
 import 'package:pharos_ai_runtime/core/result.dart';
@@ -10,17 +9,19 @@ import 'package:pharos_ai_runtime/knowledge/fact_extractor.dart';
 import 'package:pharos_ai_runtime/knowledge/knowledge_graph_builder.dart';
 import 'package:pharos_ai_runtime/models/conversation.dart';
 import 'package:pharos_ai_runtime/models/model_request.dart';
+import 'package:pharos_ai_runtime/operations/operational_snapshot.dart';
 import 'package:pharos_ai_runtime/prompts/department_prompt_builder.dart';
 
 const _doubleLine = '══════════════════════════════';
 const _defaultWorkspaceRoot = 'pharos-hq';
 
-/// Generates today's Executive Plan, grounded exclusively on the Company
-/// Knowledge Graph: Load HQ -> Company Documents -> Fact Extraction ->
-/// Knowledge Graph -> Department Facts -> Department Prompt Builder ->
-/// LLM -> Executive Plan. FactExtractor is the only place HQ document
-/// content is ever read — the Daily Agent never inspects markdown
-/// directly, and only already-computed DepartmentFacts reach the prompt.
+/// Generates today's Executive Plan, grounded exclusively on Operational
+/// State: Load HQ -> Company Documents -> Fact Extraction -> Knowledge
+/// Graph -> Department Facts -> Operational State Builder -> Operational
+/// Snapshot -> Decision Gate -> Department Prompt Builder -> LLM ->
+/// Executive Plan. Facts alone never generate recommendations: only
+/// entities the Decision Gate marks as having sufficient evidence may
+/// receive an action-level recommendation from the LLM.
 class DailyAgent extends Agent {
   DailyAgent({String? workspaceRoot})
     : _workspaceRoot =
@@ -45,9 +46,13 @@ class DailyAgent extends Agent {
     final facts = factExtractor.extract(documents);
     final graph = graphBuilder.build(facts);
     final departmentFacts = departmentFactBuilder.buildAll(graph);
+    final operationalSnapshots = [
+      for (final facts in departmentFacts)
+        OperationalSnapshot.build(departmentFacts: facts, graph: graph),
+    ];
 
     final prompt = promptBuilder.buildReport(
-      departmentFacts: departmentFacts,
+      operationalSnapshots: operationalSnapshots,
       currentDate: DateTime.now(),
     );
 
@@ -63,26 +68,27 @@ class DailyAgent extends Agent {
     print('');
     print(response.text);
     print('');
-    print(_renderBlockedItems(departmentFacts));
+    print(_renderBlockedItems(operationalSnapshots));
     print('');
-    print(_renderMissingFacts(departmentFacts));
+    print(_renderMissingOperationalData(operationalSnapshots));
     print('');
-    print(_renderRecommendedNextConnections(departmentFacts));
+    print(_renderRecommendedNextConnections(operationalSnapshots));
 
     return Result.success("Today's Executive Plan generated successfully.");
   }
 
   /// Deterministically rendered by the Runtime from the already-computed
-  /// DepartmentFacts — never left to the LLM, since identifying blockers
-  /// and gaps is exactly the kind of inference the LLM must never
-  /// perform.
-  String _renderBlockedItems(List<DepartmentFacts> departmentFacts) {
+  /// OperationalSnapshots — never left to the LLM, since deciding which
+  /// entities lack sufficient evidence is exactly the kind of inference
+  /// the LLM must never perform.
+  String _renderBlockedItems(List<OperationalSnapshot> operationalSnapshots) {
     final buffer = StringBuffer()..writeln('Blocked Items');
     final items = _dedupe([
-      for (final facts in departmentFacts)
-        for (final type in facts.missingTypes)
-          '${facts.department.displayName} cannot fully plan today '
-              'without ${type.displayName} facts — none are known yet.',
+      for (final snapshot in operationalSnapshots)
+        for (final blocked in snapshot.blocked)
+          '${snapshot.department.displayName} cannot recommend action on '
+              '${blocked.state.name} (${blocked.state.factType.displayName}) '
+              '— missing: ${blocked.missingSignals.join(', ')}.',
     ]);
 
     if (items.isEmpty) {
@@ -96,11 +102,13 @@ class DailyAgent extends Agent {
     return buffer.toString().trimRight();
   }
 
-  String _renderMissingFacts(List<DepartmentFacts> departmentFacts) {
-    final buffer = StringBuffer()..writeln('Missing Facts');
+  String _renderMissingOperationalData(
+    List<OperationalSnapshot> operationalSnapshots,
+  ) {
+    final buffer = StringBuffer()..writeln('Missing Operational Data');
     final missing = _dedupe([
-      for (final facts in departmentFacts)
-        for (final type in facts.missingTypes) type.displayName,
+      for (final snapshot in operationalSnapshots)
+        ...snapshot.missingOperationalData,
     ]);
 
     if (missing.isEmpty) {
@@ -115,12 +123,12 @@ class DailyAgent extends Agent {
   }
 
   String _renderRecommendedNextConnections(
-    List<DepartmentFacts> departmentFacts,
+    List<OperationalSnapshot> operationalSnapshots,
   ) {
     final buffer = StringBuffer()..writeln('Recommended Next Connections');
     final missing = _dedupe([
-      for (final facts in departmentFacts)
-        for (final type in facts.missingTypes) type.displayName,
+      for (final snapshot in operationalSnapshots)
+        ...snapshot.missingOperationalData,
     ]);
 
     if (missing.isEmpty) {

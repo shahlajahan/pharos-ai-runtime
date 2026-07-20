@@ -25,7 +25,7 @@ void main() {
       final stdout = result.stdout as String;
       expect(stdout, contains('PHAROS TODAY'));
       expect(stdout, contains('Blocked Items'));
-      expect(stdout, contains('Missing Facts'));
+      expect(stdout, contains('Missing Operational Data'));
       expect(stdout, contains('Recommended Next Connections'));
     } finally {
       if (workspace.existsSync()) {
