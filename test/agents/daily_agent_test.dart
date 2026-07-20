@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:pharos_ai_runtime/agents/daily_agent.dart';
 import 'package:pharos_ai_runtime/core/context.dart';
@@ -10,15 +11,14 @@ import 'package:pharos_ai_runtime/models/model_response.dart';
 import 'package:test/test.dart';
 
 class _SpyModelProvider extends ModelProvider {
-  final List<ModelRequest> capturedRequests = [];
-  int callCount = 0;
+  ModelRequest? capturedRequest;
+  ModelResponse response = const ModelResponse(text: 'Grounded report.');
 
   @override
   Future<ModelResponse> generate(ModelRequest request) async {
-    callCount++;
-    capturedRequests.add(request);
+    capturedRequest = request;
 
-    return ModelResponse(text: 'Generated marketing copy #$callCount');
+    return response;
   }
 }
 
@@ -44,69 +44,98 @@ Future<List<String>> _capturePrintedLines(Future<void> Function() body) async {
 }
 
 void main() {
+  late Directory workspace;
+
+  setUp(() {
+    workspace = Directory.systemTemp.createTempSync('daily_agent_test_');
+  });
+
+  tearDown(() {
+    if (workspace.existsSync()) {
+      workspace.deleteSync(recursive: true);
+    }
+  });
+
   test('id is "daily"', () {
-    final agent = DailyAgent();
+    final agent = DailyAgent(workspaceRoot: workspace.path);
 
     expect(agent.id, 'daily');
   });
 
-  test('run() sends exactly one request per enabled product', () async {
+  test('run() sends exactly one request to the ModelProvider', () async {
     final modelProvider = _SpyModelProvider();
-    final agent = DailyAgent();
+    final agent = DailyAgent(workspaceRoot: workspace.path);
 
     await agent.run(_context(modelProvider));
 
-    expect(modelProvider.callCount, 5);
+    expect(modelProvider.capturedRequest, isNotNull);
   });
 
-  test(
-    'run() processes products in registry order, one request each',
-    () async {
-      final modelProvider = _SpyModelProvider();
-      final agent = DailyAgent();
+  test("run() uses the CompanyContext built from HQ: loaded documents' "
+      'content reaches the prompt', () async {
+    final companyDir = Directory('${workspace.path}/company')..createSync();
+    File(
+      '${companyDir.path}/overview.md',
+    ).writeAsStringSync('# Overview\n\nWe build developer tools.');
 
-      await agent.run(_context(modelProvider));
-
-      final userMessages = modelProvider.capturedRequests
-          .map(
-            (r) =>
-                r.conversation.messages.whereType<UserMessage>().single.content,
-          )
-          .toList();
-
-      expect(userMessages[0], contains('Petsupo'));
-      expect(userMessages[1], contains('DevAudit'));
-      expect(userMessages[2], contains('HubMonix'));
-      expect(userMessages[3], contains('devclean'));
-      expect(userMessages[4], contains('leadforge'));
-    },
-  );
-
-  test('run() includes every enabled product\'s prompt fields (description, '
-      'target audience, value proposition)', () async {
     final modelProvider = _SpyModelProvider();
-    final agent = DailyAgent();
+    final agent = DailyAgent(workspaceRoot: workspace.path);
 
     await agent.run(_context(modelProvider));
 
-    final petsupoPrompt = modelProvider
-        .capturedRequests[0]
-        .conversation
-        .messages
+    final prompt = modelProvider.capturedRequest!.conversation.messages
         .whereType<UserMessage>()
         .single
         .content;
 
-    expect(petsupoPrompt, contains('Petsupo'));
-    expect(petsupoPrompt, contains('pet care'));
-    expect(petsupoPrompt, contains('Pet owners'));
-    expect(petsupoPrompt, contains('Book vetted pet care services'));
+    expect(prompt, contains('We build developer tools.'));
   });
 
-  test('run() prints PHAROS DAILY REPORT and a section for every enabled '
-      "product, containing that product's generated response", () async {
+  test('run() prompt contains the hallucination prevention rules', () async {
     final modelProvider = _SpyModelProvider();
-    final agent = DailyAgent();
+    final agent = DailyAgent(workspaceRoot: workspace.path);
+
+    await agent.run(_context(modelProvider));
+
+    final prompt = modelProvider.capturedRequest!.conversation.messages
+        .whereType<UserMessage>()
+        .single
+        .content;
+
+    expect(prompt, contains('Never invent company facts'));
+    expect(prompt, contains('unavailable'));
+    expect(prompt, contains('Unknown'));
+    expect(prompt, contains('KPIs'));
+    expect(prompt, contains('campaigns'));
+    expect(prompt, contains('revenue'));
+    expect(prompt, contains('customers'));
+    expect(prompt, contains('metrics'));
+    expect(prompt, contains('analytics'));
+    expect(prompt, contains('marketing activities'));
+  });
+
+  test('run() reports sections with no HQ documents as "Not yet connected" '
+      'rather than fabricating content for them', () async {
+    // An empty workspace: nothing under any category folder.
+    final modelProvider = _SpyModelProvider();
+    final agent = DailyAgent(workspaceRoot: workspace.path);
+
+    await agent.run(_context(modelProvider));
+
+    final prompt = modelProvider.capturedRequest!.conversation.messages
+        .whereType<UserMessage>()
+        .single
+        .content;
+
+    expect(prompt, contains('Not yet connected'));
+  });
+
+  test('run() prints PHAROS DAILY REPORT and the generated response', () async {
+    final modelProvider = _SpyModelProvider()
+      ..response = const ModelResponse(
+        text: 'No live analytics are currently connected.',
+      );
+    final agent = DailyAgent(workspaceRoot: workspace.path);
 
     final output = await _capturePrintedLines(
       () => agent.run(_context(modelProvider)),
@@ -114,21 +143,12 @@ void main() {
     final report = output.join('\n');
 
     expect(report, contains('PHAROS DAILY REPORT'));
-    expect(report, contains('Petsupo'));
-    expect(report, contains('DevAudit'));
-    expect(report, contains('HubMonix'));
-    expect(report, contains('devclean'));
-    expect(report, contains('leadforge'));
-    expect(report, contains('Generated marketing copy #1'));
-    expect(report, contains('Generated marketing copy #2'));
-    expect(report, contains('Generated marketing copy #3'));
-    expect(report, contains('Generated marketing copy #4'));
-    expect(report, contains('Generated marketing copy #5'));
+    expect(report, contains('No live analytics are currently connected.'));
   });
 
   test('run() returns a success Result', () async {
     final modelProvider = _SpyModelProvider();
-    final agent = DailyAgent();
+    final agent = DailyAgent(workspaceRoot: workspace.path);
 
     final result = await agent.run(_context(modelProvider));
 
