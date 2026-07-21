@@ -53,6 +53,55 @@ Execution (future)
   determines *what* the company should do; a `WorkflowPlanner`
   determines *how*.
 
+## Registry (`lib/workflow/registry/`)
+
+HQ-100.2 introduces the catalog a `WorkflowPlanner` will consult
+instead of hardcoding `if (decision == "launch") ...` logic:
+
+```
+Decision
+  |
+  v
+Workflow Planner
+  |
+  v
+Workflow Registry
+  |
+  v
+Workflow Definition
+  |
+  v
+Workflow Object
+```
+
+- **`WorkflowDefinition`** — a reusable workflow *template*, not a
+  running instance: `id`, `type`, `title`, `description`,
+  `supportedDecisionTypes` (which `DecisionType`s it can be matched
+  against), `defaultPriority`, `steps`, `metadata`. Immutable, no
+  runtime state, no execution logic.
+- **`WorkflowRegistry`** — stores `WorkflowDefinition`s: `register()`
+  (rejects a duplicate id rather than silently overwriting it),
+  `unregister()`, `findByType()`, `findByDecision()` (the first
+  registered definition, in registration order, whose
+  `supportedDecisionTypes` includes the Decision's type), `all()`.
+  Contains definitions only — no execution, no knowledge of agents,
+  tools, AI, or external APIs.
+- **`WorkflowMatcher`** — the thin, dedicated component a
+  `WorkflowPlanner` actually depends on: `match(Decision)` delegates
+  to `WorkflowRegistry.findByDecision()`. It never creates a Workflow
+  itself, only selects the correct definition; kept as its own class
+  (rather than folded into the registry) so future matching policy
+  (for example department- or title-aware matching) can change
+  without touching the registry's storage API.
+
+This milestone does not wire any built-in workflow definitions
+(`launch_campaign`, `partner_outreach`, `product_release`,
+`customer_support`, `engineering_task`, `finance_review`,
+`operations_review`) into a bootstrap/startup path — no such path
+exists yet. The registry's test suite demonstrates registering all
+seven using the public API described above; a future task can decide
+where the canonical built-in definitions actually live.
+
 ## Design Rules
 
 Every model here is immutable, contains no side effects, no service
