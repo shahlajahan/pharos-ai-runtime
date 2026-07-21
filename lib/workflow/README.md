@@ -102,6 +102,72 @@ exists yet. The registry's test suite demonstrates registering all
 seven using the public API described above; a future task can decide
 where the canonical built-in definitions actually live.
 
+## Planner (`lib/workflow/planner/`)
+
+HQ-100.3 answers "how should the company do it?" — planning only, still
+no execution:
+
+```
+Decision
+  |
+  v
+WorkflowMatcher
+  |
+  v
+WorkflowDefinition
+  |
+  v
+WorkflowInstance
+  |
+  v
+Execution Plan (WorkflowPlan)
+```
+
+- **`WorkflowInstance`** — one *planned execution* of a
+  `WorkflowDefinition`: `id`, `definitionId` (traces back to the
+  template), `status`, `context`, `steps`, `createdAt`, `plannedAt`.
+  Every planning request creates a new one.
+- **`WorkflowPlan`** — the deterministic execution order: `orderedSteps`
+  (a full topological order), `parallelGroups` (steps sharing no
+  dependency on each other, grouped by execution stage — matching the
+  roadmap's Launch Campaign example exactly: `[Analyze Market, Analyze
+  Budget]`, `[Design Campaign]`, `[Generate Images, Generate Videos]`,
+  `[Publish]`, `[Measure]`), `blockedSteps`, `warnings`,
+  `estimatedStepCount`. No runtime state.
+- **`PlanningResult`** — the outcome of one `plan()` call: `success`,
+  `workflow` (a `WorkflowInstance?`), `plan` (a `WorkflowPlan?`),
+  `errors`, `warnings`. `workflow`/`plan` stay `null` whenever
+  `success` is `false` — an invalid workflow never produces an
+  instance.
+- **`WorkflowPlanner`** (`lib/workflow/planner/workflow_planner.dart`)
+  — `PlanningResult plan(Decision decision, WorkflowContext context)`.
+  Contract only.
+- **`DefaultWorkflowPlanner`** — the implementation. Selects a
+  `WorkflowDefinition` via `WorkflowMatcher`, then validates its steps
+  before ever building an instance: duplicate ids, missing
+  dependencies, circular dependencies, unreachable (fully disconnected)
+  steps, and empty workflows all reject the plan (`success: false`, no
+  instance). Only once validation passes does it compute the
+  `WorkflowPlan` via a Kahn-style level ordering (each pass collects
+  every step whose dependencies are already satisfied, so
+  independent steps land in the same parallel group) and build the
+  `WorkflowInstance`. Knows workflows, dependencies, and planning only
+  — never AI, agents, tools, HTTP, LLMs, APIs, finance, or CRM.
+
+### Note on the two `WorkflowPlanner`s
+
+HQ-100.1 already introduced a `WorkflowPlanner` contract at
+`lib/workflow/contracts/workflow_planner.dart`
+(`Workflow plan(Decision decision, WorkflowContext context)` — always
+succeeds, no validation, no failure mode). This milestone's
+`lib/workflow/planner/workflow_planner.dart` is the same abstraction
+evolved with a real implementation: planning can now fail, so the
+return type became `PlanningResult` (which carries the `WorkflowInstance`
+only on success) instead of a bare `Workflow`. The HQ-100.1 contract is
+left in place, untouched and unused, rather than deleted or modified —
+`lib/workflow/planner/workflow_planner.dart` is the one a real
+`WorkflowPlanner` implementation should depend on going forward.
+
 ## Design Rules
 
 Every model here is immutable, contains no side effects, no service
