@@ -165,6 +165,38 @@ void main() {
     expect(report, isNot(contains('Missing Operational Data')));
   });
 
+  test('run() integrates a deterministic Execution Preview into the '
+      'printed Executive Brief for a decision matching the built-in '
+      'launch_campaign workflow, without executing anything', () async {
+    final productsDir = Directory('${workspace.path}/products')..createSync();
+    File(
+      '${productsDir.path}/petsupo.md',
+    ).writeAsStringSync('A pet care marketplace.');
+    final assetsDir = Directory('${workspace.path}/assets')..createSync();
+    File(
+      '${assetsDir.path}/brand-kit.md',
+    ).writeAsStringSync('Brand guidelines.');
+    File('${assetsDir.path}/hero-video.md').writeAsStringSync('Hero video.');
+
+    final modelProvider = _SpyModelProvider();
+    final agent = DailyAgent(workspaceRoot: workspace.path);
+
+    final output = await _capturePrintedLines(
+      () => agent.run(_context(modelProvider)),
+    );
+    final report = output.join('\n');
+
+    expect(report, contains('Execution Preview'));
+    expect(report, contains('Workflow: launch_campaign'));
+    expect(report, contains('Status: Ready'));
+    expect(report, contains('Group 1'));
+    expect(report, contains('✓ Analyze Market'));
+    expect(report, contains('✓ Analyze Budget'));
+    expect(report, contains('Group 5'));
+    expect(report, contains('✓ Measure'));
+    expect(report, contains('No execution has occurred.'));
+  });
+
   test('run() returns a success Result', () async {
     final modelProvider = _SpyModelProvider();
     final agent = DailyAgent(workspaceRoot: workspace.path);

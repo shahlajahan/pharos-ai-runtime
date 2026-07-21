@@ -168,6 +168,71 @@ left in place, untouched and unused, rather than deleted or modified —
 `lib/workflow/planner/workflow_planner.dart` is the one a real
 `WorkflowPlanner` implementation should depend on going forward.
 
+## Simulation (`lib/workflow/simulation/`)
+
+HQ-100.4 lets the Executive understand not only *what* should happen,
+but *how* it would happen — still without anything executing:
+
+```
+Company Decision
+  |
+  v
+Workflow Planner
+  |
+  v
+Workflow Instance
+  |
+  v
+Workflow Simulator
+  |
+  v
+Execution Preview
+  |
+  v
+Executive Brief
+```
+
+- **`WorkflowSimulation`** — the complete execution preview:
+  `workflowId`, `executionGroups`, `estimatedStepCount`,
+  `estimatedParallelGroups`, `estimatedDuration` (sum of each group's
+  *slowest* step — groups run in sequence, but steps inside one group
+  run in parallel), `warnings`, `blockedSteps`.
+- **`SimulationResult`** — the outcome of one `simulate()` call:
+  `success`, `simulation` (a `WorkflowSimulation?`), `errors`,
+  `warnings`. Mirrors `PlanningResult`'s shape, but `success` stays
+  `true` even when issues are found (they become `warnings` /
+  `blockedSteps`) — by the time a `WorkflowInstance` reaches the
+  simulator it already passed the Planner's hard validation, so the
+  simulator's own checks are a defensive second pass, not a gate.
+  `success` is only `false` when nothing can be simulated at all (no
+  steps).
+- **`WorkflowSimulator`** — walks the dependency graph independently of
+  the Planner (re-deriving groups from the instance's own steps, since
+  a step already marked `failed`/`skipped` — or depending on one — is
+  blocked for *this* preview even though the Planner never rejected the
+  original definition), estimates duration from each step's
+  `metadata['estimatedDurationSeconds']` (falling back to a 1-minute
+  default), and never mutates the `WorkflowInstance` it receives. Knows
+  workflows, dependencies, and execution order only — never AI, agents,
+  tools, HTTP, APIs, CRM, or finance.
+
+### Executive Integration
+
+`DailyAgent` now plans and simulates a Workflow for each of the
+Executive's top company decisions (at most 3) against a single
+built-in `launch_campaign` `WorkflowDefinition` — the roadmap's own
+Launch Campaign example, matched to `DecisionType.launch`, which is
+exactly the type the Decision Engine's "Prepare launch campaign" rule
+already produces. A decision with no matching workflow, or whose plan
+fails validation, simply contributes no preview; that is expected, not
+an error. The printed Executive Brief gains a Runtime-rendered
+"Execution Preview" section (`Workflow: launch_campaign`, `Status:
+Ready`/`Blocked`, then each execution group with a step title per
+line) — never sent to the LLM, since deciding execution order is
+exactly the kind of inference the LLM must never perform. No other
+built-in workflow is wired in yet; see the Registry section above for
+why.
+
 ## Design Rules
 
 Every model here is immutable, contains no side effects, no service
